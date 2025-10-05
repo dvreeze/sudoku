@@ -1,0 +1,65 @@
+/*
+ * Copyright 2025-2025 Chris de Vreeze
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package eu.cdevreeze.sudoku.model;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.stream.Gatherers;
+
+/**
+ * Sudoku game in progress (or completed), with history. The same Sudoku (game) can be played
+ * multiple times, each having its own game history.
+ *
+ * @author Chris de Vreeze
+ */
+public record GameHistory(
+        OptionalLong idOption,
+        String player,
+        Instant startTime,
+        Sudoku sudoku,
+        ImmutableList<Cell> steps) {
+
+    public GameHistory {
+        gridHistory(sudoku.startGrid(), steps);
+    }
+
+    public ImmutableList<Grid> gridHistory() {
+        return gridHistory(sudoku().startGrid(), steps);
+    }
+
+    public Grid currentGrid() {
+        return gridHistory().getLast();
+    }
+
+    private static ImmutableList<Grid> gridHistory(Grid startGrid, ImmutableList<Cell> steps) {
+        return steps.stream()
+                .gather(Gatherers.scan(
+                        () -> startGrid,
+                        (Grid accGrid, Cell step) -> {
+                            Preconditions.checkArgument(step.isFilled(), "Expected number from 0 to 9, inclusive");
+                            Optional<Grid> resultOption = accGrid.fillCellIfEmpty(step.cellPosition(), step.valueOption().orElseThrow());
+                            Preconditions.checkArgument(resultOption.isPresent(), "Expected allowed step, but got step " + step);
+                            return resultOption.orElseThrow();
+                        }
+                ))
+                .collect(ImmutableList.toImmutableList());
+    }
+}
