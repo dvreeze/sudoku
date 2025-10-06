@@ -46,7 +46,7 @@ public record GameHistory(
     }
 
     public Grid currentGrid() {
-        return gridHistory().getLast();
+        return (steps.isEmpty()) ? sudoku().startGrid() : gridHistory().getLast();
     }
 
     private static ImmutableList<Grid> gridHistory(Grid startGrid, ImmutableList<Cell> steps) {

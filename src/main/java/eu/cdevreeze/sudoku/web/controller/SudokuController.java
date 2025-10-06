@@ -16,6 +16,7 @@
 
 package eu.cdevreeze.sudoku.web.controller;
 
+import eu.cdevreeze.sudoku.model.CellPosition;
 import eu.cdevreeze.sudoku.model.GameHistory;
 import eu.cdevreeze.sudoku.model.Sudoku;
 import eu.cdevreeze.sudoku.service.SudokuService;
@@ -23,6 +24,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import java.time.Instant;
 
 /**
  * Web MVC controller for Sudoku games.
@@ -50,7 +53,32 @@ public class SudokuController {
     public String getGameHistory(@RequestParam(name = "id") long gameHistoryId, Model model) {
         GameHistory gameHistory = sudokuService.findGameHistory(gameHistoryId).orElseThrow();
         model.addAttribute("gameHistory", gameHistory);
+        model.addAttribute("title", String.format("Sudoku game %s", gameHistory.idOption().orElseThrow()));
 
-        return "game";
+        return "gameHistory";
+    }
+
+    @GetMapping(value = "/startSampleGame")
+    public String startGame(@RequestParam(name = "id") long sudokuId, Model model) {
+        GameHistory gameHistory = sudokuService.startGame(sudokuId, "Sample", Instant.now());
+        model.addAttribute("gameHistory", gameHistory);
+        model.addAttribute("title", String.format("Sudoku game %s", gameHistory.idOption().orElseThrow()));
+
+        return "gameHistory";
+    }
+
+    @GetMapping(value = "/sampleGame")
+    public String nextStep(
+            @RequestParam(name = "id") long gameHistoryId,
+            @RequestParam(name = "row") int row,
+            @RequestParam(name = "col") int col,
+            @RequestParam(name = "value") int value,
+            Model model
+    ) {
+        GameHistory gameHistory = sudokuService.fillInEmptyCell(gameHistoryId, CellPosition.of(row, col), value);
+        model.addAttribute("gameHistory", gameHistory);
+        model.addAttribute("title", String.format("Sudoku game %s", gameHistory.idOption().orElseThrow()));
+
+        return "gameHistory";
     }
 }
