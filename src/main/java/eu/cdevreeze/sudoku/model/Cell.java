@@ -47,4 +47,8 @@ public record Cell(int rowNumber, int columnNumber, OptionalInt valueOption) {
     public CellPosition cellPosition() {
         return new CellPosition(rowNumber(), columnNumber());
     }
+
+    public String valueOptionAsString() {
+        return valueOption().stream().boxed().map(String::valueOf).findFirst().orElse("");
+    }
 }

@@ -50,4 +50,6 @@ public interface SudokuService {
     Optional<Grid> findGrid(long gridId);
 
     Optional<Sudoku> findSudoku(long sudokuId);
+
+    Optional<GameHistory> findGameHistory(long gameHistoryId);
 }

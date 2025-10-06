@@ -19,10 +19,7 @@ package eu.cdevreeze.sudoku.service.jooqimpl;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import eu.cdevreeze.sudoku.jooq.tables.records.CellRecord;
-import eu.cdevreeze.sudoku.jooq.tables.records.GameHistoryRecord;
-import eu.cdevreeze.sudoku.jooq.tables.records.GridRecord;
-import eu.cdevreeze.sudoku.jooq.tables.records.SudokuRecord;
+import eu.cdevreeze.sudoku.jooq.tables.records.*;
 import eu.cdevreeze.sudoku.model.*;
 import eu.cdevreeze.sudoku.service.SudokuService;
 import org.jooq.DSLContext;
@@ -33,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
@@ -48,8 +46,8 @@ import static org.jooq.impl.DSL.*;
 @ConditionalOnBooleanProperty(name = "useJooq")
 public class JooqSudokuService implements SudokuService {
 
-    private record CellDatabaseTableRow(
-            @Nullable Long id,
+    private record CellTableRow(
+            Long id,
             Long gridId,
             Integer rowNumber,
             Integer columnNumber,
@@ -65,27 +63,65 @@ public class JooqSudokuService implements SudokuService {
         }
     }
 
-    private record GridDatabaseTableRow(
-            @Nullable Long id,
-            List<CellDatabaseTableRow> cells
+    private record GridTableRow(
+            Long id,
+            List<CellTableRow> cells
     ) {
 
         public Grid toGrid() {
             return Grid.fromCells(
-                    cells().stream().map(CellDatabaseTableRow::toCell).collect(ImmutableSet.toImmutableSet())
+                    cells().stream().map(CellTableRow::toCell).collect(ImmutableSet.toImmutableSet())
             ).withId(Objects.requireNonNull(id()));
         }
     }
 
-    private record SudokuDatabaseTableRow(
-            @Nullable Long id,
-            GridDatabaseTableRow grid
+    private record SudokuTableRow(
+            Long id,
+            GridTableRow grid
     ) {
 
         public Sudoku toSudoku() {
             return new Sudoku(
                     OptionalLong.of(Objects.requireNonNull(id())),
                     grid.toGrid()
+            );
+        }
+    }
+
+    private record StepTableRow(
+            Long gameHistoryId,
+            Integer stepSeqNumber,
+            Integer rowNumber,
+            Integer columnNumber,
+            Integer stepValue
+    ) {
+
+        public Cell toCell() {
+            return new Cell(
+                    rowNumber(),
+                    columnNumber(),
+                    Optional.of(stepValue()).stream().mapToInt(v -> v).findFirst()
+            );
+        }
+    }
+
+    private record GameHistoryTableRow(
+            Long id,
+            String player,
+            OffsetDateTime startTime,
+            SudokuTableRow sudoku,
+            List<StepTableRow> steps
+    ) {
+
+        public GameHistory toGameHistory() {
+            return new GameHistory(
+                    Optional.of(id()).stream().mapToLong(v -> v).findFirst(),
+                    player(),
+                    startTime().toInstant(),
+                    sudoku().toSudoku(),
+                    steps().stream()
+                            .map(StepTableRow::toCell)
+                            .collect(ImmutableList.toImmutableList())
             );
         }
     }
@@ -133,20 +169,57 @@ public class JooqSudokuService implements SudokuService {
                 .fetchOne();
         Preconditions.checkArgument(gameHistoryRecord != null);
 
-        return new GameHistory(
+        GameHistory gameHistory = new GameHistory(
                 OptionalLong.of(gameHistoryRecord.getGameHistoryId()),
                 gameHistoryRecord.getPlayer(),
                 gameHistoryRecord.getStartTime().toInstant(),
                 sudoku,
                 ImmutableList.of()
         );
+
+        Preconditions.checkArgument(gameHistory.currentGrid().isStillValid());
+
+        return gameHistory;
     }
 
     @Override
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value) {
-        // TODO
-        return null;
+        GameHistory gameHistory = findGameHistory(gameHistoryId).orElseThrow();
+
+        Preconditions.checkArgument(gameHistory.currentGrid().isStillValid());
+        Preconditions.checkArgument(
+                gameHistory.currentGrid().fillCellIfEmpty(pos, value).stream().anyMatch(Grid::isStillValid));
+
+        StepRecord stepRecord = dsl.insertInto(STEP)
+                .columns(STEP.GAME_HISTORY_ID, STEP.STEP_SEQ_NUMBER, STEP.ROW_NUMBER, STEP.COLUMN_NUMBER, STEP.STEP_VALUE)
+                .values(
+                        gameHistory.idOption().orElseThrow(),
+                        1 + Objects.requireNonNull(
+                                dsl.selectCount().from(STEP).where(STEP.GAME_HISTORY_ID.eq(gameHistoryId)).fetchOne()
+                        ).value1(),
+                        pos.rowNumber(),
+                        pos.columnNumber(),
+                        value
+                )
+                .returning()
+                .fetchOne();
+        Preconditions.checkArgument(stepRecord != null);
+
+        GameHistory resultGameHistory = new GameHistory(
+                gameHistory.idOption(),
+                gameHistory.player(),
+                gameHistory.startTime(),
+                gameHistory.sudoku(),
+                ImmutableList.<Cell>builder()
+                        .addAll(gameHistory.steps())
+                        .add(new Cell(stepRecord.getRowNumber(), stepRecord.getColumnNumber(), OptionalInt.of(stepRecord.getStepValue())))
+                        .build()
+        );
+
+        Preconditions.checkArgument(resultGameHistory.currentGrid().isStillValid());
+
+        return resultGameHistory;
     }
 
     @Override
@@ -163,16 +236,17 @@ public class JooqSudokuService implements SudokuService {
                                         CELL.CELL_VALUE
                                 ).from(CELL)
                                         .where(CELL.GRID_ID.eq(GRID.GRID_ID))
-                        ).convertFrom(r -> r.map(Records.mapping(CellDatabaseTableRow::new)))
+                        ).convertFrom(r -> r.map(Records.mapping(CellTableRow::new)))
                 )
                 .from(GRID)
                 .where(GRID.GRID_ID.eq(gridId))
                 .fetchOptional()
-                .map(Records.mapping(GridDatabaseTableRow::new))
-                .map(GridDatabaseTableRow::toGrid);
+                .map(Records.mapping(GridTableRow::new))
+                .map(GridTableRow::toGrid);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Sudoku> findSudoku(long sudokuId) {
         return dsl.selectDistinct(
                         SUDOKU.SUDOKU_ID,
@@ -187,16 +261,62 @@ public class JooqSudokuService implements SudokuService {
                                                 CELL.CELL_VALUE
                                         ).from(CELL)
                                                 .where(CELL.GRID_ID.eq(GRID.GRID_ID))
-                                ).convertFrom(r -> r.map(Records.mapping(CellDatabaseTableRow::new)))
-                        ).convertFrom(Records.mapping(GridDatabaseTableRow::new))
+                                ).convertFrom(r -> r.map(Records.mapping(CellTableRow::new)))
+                        ).convertFrom(Records.mapping(GridTableRow::new))
                 )
                 .from(SUDOKU)
                 .leftJoin(GRID)
                 .on(SUDOKU.START_GRID_ID.eq(GRID.GRID_ID))
                 .where(SUDOKU.SUDOKU_ID.eq(sudokuId))
                 .fetchOptional()
-                .map(Records.mapping(SudokuDatabaseTableRow::new))
-                .map(SudokuDatabaseTableRow::toSudoku);
+                .map(Records.mapping(SudokuTableRow::new))
+                .map(SudokuTableRow::toSudoku);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<GameHistory> findGameHistory(long gameHistoryId) {
+        return dsl.selectDistinct(
+                        GAME_HISTORY.GAME_HISTORY_ID,
+                        GAME_HISTORY.PLAYER,
+                        GAME_HISTORY.START_TIME,
+                        row(
+                                SUDOKU.SUDOKU_ID,
+                                row(
+                                        GRID.GRID_ID,
+                                        multiset(
+                                                select(
+                                                        CELL.CELL_ID,
+                                                        CELL.GRID_ID,
+                                                        CELL.ROW_NUMBER,
+                                                        CELL.COLUMN_NUMBER,
+                                                        CELL.CELL_VALUE
+                                                ).from(CELL)
+                                                        .where(CELL.GRID_ID.eq(GRID.GRID_ID))
+                                        ).convertFrom(r -> r.map(Records.mapping(CellTableRow::new)))
+                                ).convertFrom(Records.mapping(GridTableRow::new))
+                        ).convertFrom(Records.mapping(SudokuTableRow::new)),
+                        multiset(
+                                select(
+                                        STEP.GAME_HISTORY_ID,
+                                        STEP.STEP_SEQ_NUMBER,
+                                        STEP.ROW_NUMBER,
+                                        STEP.COLUMN_NUMBER,
+                                        STEP.STEP_VALUE
+                                ).from(STEP)
+                                        .where(STEP.GAME_HISTORY_ID.eq(GAME_HISTORY.GAME_HISTORY_ID))
+                                        .orderBy(STEP.STEP_SEQ_NUMBER)
+                        ).convertFrom(r -> r.map(Records.mapping(StepTableRow::new)))
+                )
+                .from(GAME_HISTORY)
+                .leftJoin(SUDOKU)
+                .on(GAME_HISTORY.SUDOKU_ID.eq(SUDOKU.SUDOKU_ID))
+                .leftJoin(GRID)
+                .on(SUDOKU.START_GRID_ID.eq(GRID.GRID_ID))
+                .where(GAME_HISTORY.GAME_HISTORY_ID.eq(gameHistoryId))
+                .fetchOptional()
+                .map(Records.mapping(GameHistoryTableRow::new))
+                .map(GameHistoryTableRow::toGameHistory);
     }
 
     private Grid createGrid(Grid grid) {
