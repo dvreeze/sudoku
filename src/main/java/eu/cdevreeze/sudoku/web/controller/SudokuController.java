@@ -55,7 +55,7 @@ public class SudokuController {
         model.addAttribute("gameHistory", gameHistory);
         model.addAttribute("title", String.format("Sudoku game %s", gameHistory.idOption().orElseThrow()));
 
-        return "gameHistory";
+        return "game";
     }
 
     @GetMapping(value = "/startSampleGame")
@@ -64,7 +64,7 @@ public class SudokuController {
         model.addAttribute("gameHistory", gameHistory);
         model.addAttribute("title", String.format("Sudoku game %s", gameHistory.idOption().orElseThrow()));
 
-        return "gameHistory";
+        return "game";
     }
 
     @GetMapping(value = "/sampleGame")
@@ -79,6 +79,6 @@ public class SudokuController {
         model.addAttribute("gameHistory", gameHistory);
         model.addAttribute("title", String.format("Sudoku game %s", gameHistory.idOption().orElseThrow()));
 
-        return "gameHistory";
+        return "game";
     }
 }

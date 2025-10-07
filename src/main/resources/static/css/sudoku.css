@@ -1,0 +1,13 @@
+
+.wrapper {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+}
+
+.wrapper div {
+  aspect-ratio: 1 / 1;
+  border: 2px solid;
+  border-collapse: collapse;
+  text-align: center;
+  font-size: 2.5em;
+}

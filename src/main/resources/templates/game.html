@@ -6,23 +6,24 @@
     <title>Sudoku Game History</title>
     <!-- See https://bootswatch.com/flatly/ -->
     <link th:href="@{/css/bootstrap.min.css}" rel="stylesheet">
+    <link th:href="@{/css/sudoku.css}" rel="stylesheet">
 </head>
 <!-- For the Bootstrap Grid System, see https://getbootstrap.com/docs/5.2/layout/grid/ -->
+<!-- Using a CSS grid layout for the Sudoku grid, to help create cells of equal width and height. -->
+<!-- Mind the use of the aspect-ratio CSS property to create such cells. -->
 <body>
 <div class="container pt-5">
     <div class="row gx-5 gy-5">
-        <div class="col-12">
-            <table class="table table-bordered table-striped table-responsive-sm caption-top">
-                <caption><strong th:text="${title}" class="h4">Sudoku</strong></caption>
-                <tbody>
-                <tr th:each="row : ${gameHistory.currentGrid.rows}">
-                    <td th:each="cell : ${row.cells}" th:text="${cell.valueOptionAsString}">
-                        Cell
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+        <div class="col-7">
+            <caption><strong th:text="${title}" class="h4">Sudoku</strong></caption>
+            <div class="wrapper">
+                <div th:each="cell : ${gameHistory.currentGrid.cells}"
+                     th:text="${cell.valueOptionAsString}">
+                    Cell
+                </div>
+            </div>
         </div>
+        <div class="col-5">&nbsp;</div>
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
