@@ -1,13 +1,42 @@
 
-.wrapper {
+.sudoku-wrapper h4 {
+  padding-bottom: 20px;
+}
+
+/* See https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_grid_layout */
+/* Also see https://developer.mozilla.org/en-US/docs/Web/CSS/aspect-ratio */
+
+.sudoku-grid {
   display: grid;
   grid-template-columns: repeat(9, 1fr);
 }
 
-.wrapper div {
+.sudoku-grid div {
   aspect-ratio: 1 / 1;
-  border: 2px solid;
+  border: 1px solid;
   border-collapse: collapse;
   text-align: center;
   font-size: 2.5em;
+}
+
+/* See https://developer.mozilla.org/en-US/docs/Web/CSS/:nth-child */
+
+.sudoku-grid div:nth-child(9n + 1) {
+  border-left: 5px solid;
+}
+.sudoku-grid div:nth-child(3n) {
+  border-right: 5px solid;
+}
+
+.sudoku-grid div:nth-child(-n + 9) {
+  border-top: 5px solid;
+}
+.sudoku-grid div:nth-child(n + 19):nth-child(-n + 27) {
+  border-bottom: 5px solid;
+}
+.sudoku-grid div:nth-child(n + 46):nth-child(-n + 54) {
+  border-bottom: 5px solid;
+}
+.sudoku-grid div:nth-child(n + 73):nth-child(-n + 81) {
+  border-bottom: 5px solid;
 }

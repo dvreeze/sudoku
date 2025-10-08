@@ -20,12 +20,14 @@ import eu.cdevreeze.sudoku.model.CellPosition;
 import eu.cdevreeze.sudoku.model.GameHistory;
 import eu.cdevreeze.sudoku.model.Sudoku;
 import eu.cdevreeze.sudoku.service.SudokuService;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Web MVC controller for Sudoku games.
@@ -78,6 +80,27 @@ public class SudokuController {
         GameHistory gameHistory = sudokuService.fillInEmptyCell(gameHistoryId, CellPosition.of(row, col), value);
         model.addAttribute("gameHistory", gameHistory);
         model.addAttribute("title", String.format("Sudoku game %s", gameHistory.idOption().orElseThrow()));
+
+        return "game";
+    }
+
+    @GetMapping(value = "/replayGame")
+    public String replayGame(
+            @RequestParam(name = "id") long gameHistoryId,
+            @Nullable @RequestParam(name = "stepIndex", required = false, defaultValue = "0") Integer stepIndex,
+            Model model
+    ) {
+        GameHistory entireGameHistory = sudokuService.findGameHistory(gameHistoryId).orElseThrow();
+        GameHistory gameHistory = entireGameHistory.slice(Optional.ofNullable(stepIndex).orElse(0));
+
+        model.addAttribute("gameHistory", gameHistory);
+        model.addAttribute("title", String.format("Sudoku game %s", gameHistoryId));
+
+        Optional<CellPosition> lastCellOption =
+                gameHistory.steps().isEmpty() ?
+                        Optional.empty() :
+                        Optional.of(gameHistory.steps().getLast().cellPosition());
+        model.addAttribute("lastStepOption", lastCellOption);
 
         return "game";
     }

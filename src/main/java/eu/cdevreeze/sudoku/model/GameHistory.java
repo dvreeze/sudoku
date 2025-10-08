@@ -49,6 +49,25 @@ public record GameHistory(
         return (steps.isEmpty()) ? sudoku().startGrid() : gridHistory().getLast();
     }
 
+    public boolean isSolved() {
+        return currentGrid().isSolved();
+    }
+
+    public boolean isStillValid() {
+        return currentGrid().isStillValid();
+    }
+
+    public GameHistory slice(int lastStepIndex) {
+        Preconditions.checkArgument(lastStepIndex >= 0 && lastStepIndex < steps.size());
+        return new GameHistory(
+                OptionalLong.empty(),
+                player(),
+                startTime(),
+                sudoku(),
+                steps().subList(0, lastStepIndex + 1)
+        );
+    }
+
     private static ImmutableList<Grid> gridHistory(Grid startGrid, ImmutableList<Cell> steps) {
         return steps.stream()
                 .gather(Gatherers.scan(

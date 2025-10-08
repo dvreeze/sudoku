@@ -13,17 +13,17 @@
 <!-- Mind the use of the aspect-ratio CSS property to create such cells. -->
 <body>
 <div class="container pt-5">
-    <div class="row gx-5 gy-5">
-        <div class="col-7">
-            <caption><strong th:text="${title}" class="h4">Sudoku</strong></caption>
-            <div class="wrapper">
+    <div class="row justify-content-center">
+        <div class="col-6 sudoku-wrapper">
+            <h4 th:text="${title}" class="h4">Sudoku</h4>
+            <!-- Here the grid layout starts -->
+            <div class="sudoku-grid">
                 <div th:each="cell : ${gameHistory.currentGrid.cells}"
                      th:text="${cell.valueOptionAsString}">
                     Cell
                 </div>
             </div>
         </div>
-        <div class="col-5">&nbsp;</div>
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
