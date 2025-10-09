@@ -94,7 +94,13 @@ public class SudokuController {
         GameHistory gameHistory = entireGameHistory.slice(Optional.ofNullable(stepIndex).orElse(0));
 
         model.addAttribute("gameHistory", gameHistory);
-        model.addAttribute("title", String.format("Sudoku game %s", gameHistoryId));
+        model.addAttribute("title", String.format("Sudoku game %s (replay)", gameHistoryId));
+        model.addAttribute("gameHistoryId", gameHistoryId);
+        model.addAttribute("stepIndex", stepIndex);
+        model.addAttribute(
+                "nextStepIndex",
+                Math.min(entireGameHistory.steps().size() - 1, 1 + Optional.ofNullable(stepIndex).orElse(0))
+        );
 
         Optional<CellPosition> lastCellOption =
                 gameHistory.steps().isEmpty() ?
@@ -102,6 +108,6 @@ public class SudokuController {
                         Optional.of(gameHistory.steps().getLast().cellPosition());
         model.addAttribute("lastStepOption", lastCellOption);
 
-        return "game";
+        return "gameReplay";
     }
 }
