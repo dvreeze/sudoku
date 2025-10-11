@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.stream.IntStream;
 
 /**
@@ -34,15 +35,23 @@ public record Column(int columnNumber, ImmutableList<OptionalInt> optionalValues
         Preconditions.checkArgument(optionalValues.size() == Constants.ROW_COUNT_IN_GRID);
     }
 
+    /**
+     * Returns all {@link Cell} instances, in the correct order.
+     * The database IDs of the cells, if any, are lost.
+     */
     public ImmutableList<Cell> cells() {
         return IntStream.range(0, optionalValues().size())
                 .boxed()
-                .map(idx -> new Cell(idx, columnNumber(), optionalValues().get(idx)))
+                .map(idx -> new Cell(OptionalLong.empty(), idx, columnNumber(), optionalValues().get(idx)))
                 .collect(ImmutableList.toImmutableList());
     }
 
+    /**
+     * Returns the {@link Cell} at the given row number (0-based).
+     * The database ID of the cell, if any, is lost.
+     */
     public Cell cell(int rowNumber) {
         Preconditions.checkArgument(rowNumber >= 0 && rowNumber < Constants.ROW_COUNT_IN_GRID);
-        return new Cell(rowNumber, columnNumber(), optionalValues().get(rowNumber));
+        return new Cell(OptionalLong.empty(), rowNumber, columnNumber(), optionalValues().get(rowNumber));
     }
 }

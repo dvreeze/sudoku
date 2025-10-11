@@ -56,6 +56,7 @@ public class JooqSudokuService implements SudokuService {
 
         public Cell toCell() {
             return new Cell(
+                    OptionalLong.of(id),
                     rowNumber(),
                     columnNumber(),
                     Optional.ofNullable(cellValue()).stream().mapToInt(v -> v).findFirst()
@@ -96,11 +97,12 @@ public class JooqSudokuService implements SudokuService {
             Integer stepValue
     ) {
 
-        public Cell toCell() {
-            return new Cell(
+        public Step toStep() {
+            return new Step(
+                    Optional.of(new StepKey(gameHistoryId, stepSeqNumber)),
                     rowNumber(),
                     columnNumber(),
-                    Optional.of(stepValue()).stream().mapToInt(v -> v).findFirst()
+                    stepValue
             );
         }
     }
@@ -120,7 +122,7 @@ public class JooqSudokuService implements SudokuService {
                     startTime().toInstant(),
                     sudoku().toSudoku(),
                     steps().stream()
-                            .map(StepTableRow::toCell)
+                            .map(StepTableRow::toStep)
                             .collect(ImmutableList.toImmutableList())
             );
         }
@@ -211,9 +213,16 @@ public class JooqSudokuService implements SudokuService {
                 gameHistory.player(),
                 gameHistory.startTime(),
                 gameHistory.sudoku(),
-                ImmutableList.<Cell>builder()
+                ImmutableList.<Step>builder()
                         .addAll(gameHistory.steps())
-                        .add(new Cell(stepRecord.getRowNumber(), stepRecord.getColumnNumber(), OptionalInt.of(stepRecord.getStepValue())))
+                        .add(
+                                new Step(
+                                        Optional.of(new StepKey(stepRecord.getGameHistoryId(), stepRecord.getStepSeqNumber())),
+                                        stepRecord.getRowNumber(),
+                                        stepRecord.getColumnNumber(),
+                                        stepRecord.getStepValue()
+                                )
+                        )
                         .build()
         );
 
@@ -346,6 +355,7 @@ public class JooqSudokuService implements SudokuService {
             Preconditions.checkArgument(cellRecord != null);
             cells.add(
                     new Cell(
+                            OptionalLong.of(cellRecord.getCellId()),
                             cellRecord.getRowNumber(),
                             cellRecord.getColumnNumber(),
                             Optional.ofNullable(cellRecord.getCellValue()).stream().mapToInt(v -> v).findFirst()

@@ -35,7 +35,7 @@ public record GameHistory(
         String player,
         Instant startTime,
         Sudoku sudoku,
-        ImmutableList<Cell> steps) {
+        ImmutableList<Step> steps) {
 
     public GameHistory {
         gridHistory(sudoku.startGrid(), steps);
@@ -68,13 +68,12 @@ public record GameHistory(
         );
     }
 
-    private static ImmutableList<Grid> gridHistory(Grid startGrid, ImmutableList<Cell> steps) {
+    private static ImmutableList<Grid> gridHistory(Grid startGrid, ImmutableList<Step> steps) {
         return steps.stream()
                 .gather(Gatherers.scan(
                         () -> startGrid,
-                        (Grid accGrid, Cell step) -> {
-                            Preconditions.checkArgument(step.isFilled(), "Expected number from 0 to 9, inclusive");
-                            Optional<Grid> resultOption = accGrid.fillCellIfEmpty(step.cellPosition(), step.valueOption().orElseThrow());
+                        (Grid accGrid, Step step) -> {
+                            Optional<Grid> resultOption = accGrid.fillCellIfEmpty(step.cellPosition(), step.value());
                             Preconditions.checkArgument(resultOption.isPresent(), "Expected allowed step, but got step " + step);
                             return resultOption.orElseThrow();
                         }

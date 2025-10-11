@@ -18,38 +18,25 @@ package eu.cdevreeze.sudoku.model;
 
 import com.google.common.base.Preconditions;
 
-import java.util.OptionalInt;
-import java.util.OptionalLong;
+import java.util.Optional;
 
 /**
- * One cell in a Sudoku grid. The row and column numbers are coordinates in the grid, and not relative
+ * One step in a Sudoku game. The row and column numbers are coordinates in the grid, and not relative
  * coordinates in a block (that would be relative to the left upper corner of the block).
  *
  * @author Chris de Vreeze
  */
-public record Cell(OptionalLong idOption, int rowNumber, int columnNumber, OptionalInt valueOption) {
+public record Step(Optional<StepKey> stepKeyOption, int rowNumber, int columnNumber, int value) {
 
-    public Cell {
+    public Step {
         Preconditions.checkArgument(rowNumber >= 0);
         Preconditions.checkArgument(rowNumber < Constants.ROW_COUNT_IN_GRID);
         Preconditions.checkArgument(columnNumber >= 0);
         Preconditions.checkArgument(columnNumber < Constants.COLUMN_COUNT_IN_GRID);
-        Preconditions.checkArgument(valueOption.stream().allMatch(v -> v >= 1 && v <= 9));
-    }
-
-    public boolean isFilled() {
-        return valueOption().isPresent();
-    }
-
-    public boolean isEmpty() {
-        return valueOption().isEmpty();
+        Preconditions.checkArgument(value >= 1 && value <= 9);
     }
 
     public CellPosition cellPosition() {
         return new CellPosition(rowNumber(), columnNumber());
-    }
-
-    public String valueOptionAsString() {
-        return valueOption().stream().boxed().map(String::valueOf).findFirst().orElse("");
     }
 }

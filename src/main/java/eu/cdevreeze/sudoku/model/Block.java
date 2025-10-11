@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.stream.IntStream;
 
 /**
@@ -88,11 +89,16 @@ public record Block(
         return new Block.Column(ImmutableList.copyOf(blockColumnCells));
     }
 
+    /**
+     * Returns the {@link Cell} at the given row and column numbers (0-based).
+     * The database ID of the cell, if any, is lost.
+     */
     public Cell cell(int blockRowNumber, int blockColumnNumber) {
         Preconditions.checkArgument(blockRowNumber >= 0 && blockRowNumber < Constants.ROW_COUNT_IN_BLOCK);
         Preconditions.checkArgument(blockColumnNumber >= 0 && blockColumnNumber < Constants.COLUMN_COUNT_IN_BLOCK);
 
         return new Cell(
+                OptionalLong.empty(),
                 upperLeftRowNumber + blockRowNumber,
                 upperLeftColumnNumber + blockColumnNumber,
                 optionalValues().get((3 * blockRowNumber) + blockColumnNumber)
