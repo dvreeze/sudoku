@@ -31,12 +31,8 @@ public class StepEntity {
 
     @MapsId("gameHistoryId")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "game_history_id")
+    @JoinColumn(name = "game_history_id", nullable = false)
     private GameHistoryEntity gameHistory;
-
-    @MapsId("stepSeqNumber")
-    @Column(name = "step_seq_number", nullable = false)
-    private Integer stepSeqNumber;
 
     @Column(name = "row_number", nullable = false, columnDefinition = "ROW_IDX")
     private Integer rowNumber;
@@ -51,20 +47,16 @@ public class StepEntity {
         return stepKey;
     }
 
-    public GameHistoryEntity getGameHistory() {
-        return gameHistory;
+    public void setStepKey(StepEntityKey stepKey) {
+        this.stepKey = stepKey;
     }
 
-    public void setGameHistory(GameHistoryEntity gameHistory) {
-        this.gameHistory = gameHistory;
+    public Long getGameHistoryId() {
+        return stepKey.gameHistoryId();
     }
 
     public Integer getStepSeqNumber() {
-        return stepSeqNumber;
-    }
-
-    public void setStepSeqNumber(Integer stepSeqNumber) {
-        this.stepSeqNumber = stepSeqNumber;
+        return stepKey.stepSeqNumber();
     }
 
     public Integer getRowNumber() {

@@ -51,7 +51,6 @@ public class GameHistoryEntity {
 
     public void addStep(StepEntity step) {
         steps.add(step);
-        step.setGameHistory(this);
     }
 
     public Set<StepEntity> getSteps() {

@@ -125,8 +125,18 @@ public class JpaSudokuService implements SudokuService {
         GameHistoryEntity gameHistoryEntity = convertToGameHistoryEntity(gameHistory);
 
         StepEntity stepEntity = new StepEntity();
-        stepEntity.setGameHistory(gameHistoryEntity);
-        stepEntity.setStepSeqNumber(1 + gameHistory.steps().size()); // TODO Fix!
+        stepEntity.setStepKey(
+                new StepEntityKey(
+                        gameHistoryId,
+                        1 + gameHistory.steps()
+                                .stream()
+                                .flatMap(step -> step.stepKeyOption().stream())
+                                .map(StepKey::stepSeqNumber)
+                                .mapToInt(v -> v)
+                                .max()
+                                .orElse(0)
+                )
+        );
         stepEntity.setRowNumber(pos.rowNumber());
         stepEntity.setColumnNumber(pos.columnNumber());
         stepEntity.setStepValue(value);
@@ -317,8 +327,10 @@ public class JpaSudokuService implements SudokuService {
         gameHistoryEntity.setSudoku(convertToSudokuEntity(gameHistory.sudoku()));
         gameHistory.steps().forEach(step -> {
             StepEntity stepEntity = new StepEntity();
-            stepEntity.setStepSeqNumber(
-                    step.stepKeyOption().orElseThrow().stepSeqNumber()
+            gameHistory.idOption().ifPresent(gameHistoryId ->
+                    stepEntity.setStepKey(
+                            new StepEntityKey(gameHistoryId, step.stepKeyOption().orElseThrow().stepSeqNumber())
+                    )
             );
             stepEntity.setRowNumber(step.rowNumber());
             stepEntity.setColumnNumber(step.columnNumber());
