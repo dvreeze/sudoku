@@ -198,7 +198,10 @@ public class JooqSudokuService implements SudokuService {
                 .values(
                         gameHistory.idOption().orElseThrow(),
                         1 + Objects.requireNonNull(
-                                dsl.selectCount().from(STEP).where(STEP.GAME_HISTORY_ID.eq(gameHistoryId)).fetchOne()
+                                dsl.select(coalesce(max(STEP.STEP_SEQ_NUMBER), 0))
+                                        .from(STEP)
+                                        .where(STEP.GAME_HISTORY_ID.eq(gameHistoryId))
+                                        .fetchOne()
                         ).value1(),
                         pos.rowNumber(),
                         pos.columnNumber(),
