@@ -87,19 +87,19 @@ public class SudokuController {
     @GetMapping(value = "/replayGame")
     public String replayGame(
             @RequestParam(name = "id") long gameHistoryId,
-            @Nullable @RequestParam(name = "stepIndex", required = false, defaultValue = "0") Integer stepIndex,
+            @Nullable @RequestParam(name = "stepIndex", required = false, defaultValue = "0") Integer stepToIndex,
             Model model
     ) {
         GameHistory entireGameHistory = sudokuService.findGameHistory(gameHistoryId).orElseThrow();
-        GameHistory gameHistory = entireGameHistory.slice(Optional.ofNullable(stepIndex).orElse(0));
+        GameHistory gameHistory = entireGameHistory.slice(Optional.ofNullable(stepToIndex).orElse(0));
 
         model.addAttribute("gameHistory", gameHistory);
         model.addAttribute("title", String.format("Sudoku game %s (replay)", gameHistoryId));
         model.addAttribute("gameHistoryId", gameHistoryId);
-        model.addAttribute("stepIndex", stepIndex);
+        model.addAttribute("stepIndex", stepToIndex);
         model.addAttribute(
                 "nextStepIndex",
-                Math.min(entireGameHistory.steps().size() - 1, 1 + Optional.ofNullable(stepIndex).orElse(0))
+                Math.min(entireGameHistory.steps().size(), 1 + Optional.ofNullable(stepToIndex).orElse(0))
         );
 
         Optional<CellPosition> lastCellOption =

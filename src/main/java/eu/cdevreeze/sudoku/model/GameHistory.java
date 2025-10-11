@@ -57,14 +57,14 @@ public record GameHistory(
         return currentGrid().isStillValid();
     }
 
-    public GameHistory slice(int lastStepIndex) {
-        Preconditions.checkArgument(lastStepIndex >= 0 && lastStepIndex < steps.size());
+    public GameHistory slice(int stepToIndex) {
+        Preconditions.checkArgument(stepToIndex >= 0 && stepToIndex <= steps.size());
         return new GameHistory(
                 OptionalLong.empty(),
                 player(),
                 startTime(),
                 sudoku(),
-                steps().subList(0, lastStepIndex + 1)
+                steps().subList(0, stepToIndex)
         );
     }
 
