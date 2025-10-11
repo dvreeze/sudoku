@@ -40,6 +40,16 @@
  * If the database schema changes, the validation of the JPA entity classes against the schema likely
  * fails. After fixing that, an updated JPA metamodel is generated, and the criteria queries are checked
  * by the Java compiler against that updated metamodel.
+ * <p>
+ * One important design decision regarding JPA entities is whether to use {@link java.util.List} or
+ * {@link java.util.Set} for one-to-many and many-to-many associations. This is also related to the
+ * implementation of {@link java.lang.Object#equals} and {@link java.lang.Object#hashCode}. For more
+ * information on this, see
+ * <a href="https://thorben-janssen.com/association-mappings-bag-list-set/">association mappings</a>
+ * and <a href="https://thorben-janssen.com/ultimate-guide-to-implementing-equals-and-hashcode-with-hibernate/">Hibernate equals and hashCode</a>.
+ * Yet also mind the
+ * <a href="https://thorben-janssen.com/fix-multiplebagfetchexception-hibernate/">multiple bag exception</a>
+ * when retrieving multiple "to-many" associations, and what that means in this context.
  *
  * @author Chris de Vreeze
  */

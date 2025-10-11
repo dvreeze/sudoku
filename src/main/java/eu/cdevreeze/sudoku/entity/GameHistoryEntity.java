@@ -19,8 +19,8 @@ package eu.cdevreeze.sudoku.entity;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * GameHistory JPA entity. Each instance represents a row in the corresponding table.
@@ -47,17 +47,17 @@ public class GameHistoryEntity {
     private OffsetDateTime startTime;
 
     @OneToMany(mappedBy = "gameHistory")
-    private Set<StepEntity> steps = new HashSet<>();
+    private List<StepEntity> steps = new ArrayList<>();
 
     public void addStep(StepEntity step) {
         steps.add(step);
     }
 
-    public Set<StepEntity> getSteps() {
+    public List<StepEntity> getSteps() {
         return steps;
     }
 
-    public void setSteps(Set<StepEntity> steps) {
+    public void setSteps(List<StepEntity> steps) {
         this.steps = steps;
     }
 

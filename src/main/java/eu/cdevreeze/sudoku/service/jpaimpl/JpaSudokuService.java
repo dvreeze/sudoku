@@ -225,6 +225,29 @@ public class JpaSudokuService implements SudokuService {
         Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
         System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
 
+        // Avoiding a cartesian product ("MultiBagFetchException") by using 2 criteria queries
+
+        Optional<GameHistory> partialGameHistoryOption = findGameHistoryWithoutGridCells(gameHistoryId);
+
+        Optional<Sudoku> sudokuOption = partialGameHistoryOption.map(GameHistory::sudoku);
+
+        return partialGameHistoryOption
+                .flatMap(gameHist ->
+                        sudokuOption.map(sudoku -> new GameHistory(
+                                gameHist.idOption(),
+                                gameHist.player(),
+                                gameHist.startTime(),
+                                sudoku,
+                                gameHist.steps()
+                        )));
+    }
+
+    // Private query methods
+
+    private Optional<GameHistory> findGameHistoryWithoutGridCells(long gameHistoryId) {
+        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+
         // First build up the query (without worrying about the load/fetch graph)
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<GameHistoryEntity> cq = cb.createQuery(GameHistoryEntity.class);
@@ -240,8 +263,6 @@ public class JpaSudokuService implements SudokuService {
         gameHistoryGraph.addAttributeNode(GameHistoryEntity_.sudoku);
         Subgraph<SudokuEntity> sudokuSubgraph = gameHistoryGraph.addSubgraph(GameHistoryEntity_.sudoku);
         sudokuSubgraph.addAttributeNode(SudokuEntity_.startGrid);
-        Subgraph<GridEntity> gridSubgraph = sudokuSubgraph.addSubgraph(SudokuEntity_.startGrid);
-        gridSubgraph.addAttributeNode(GridEntity_.cells);
 
         // Run the query, providing the load graph as query hint
         // Note that JPA entities do not escape the persistence context

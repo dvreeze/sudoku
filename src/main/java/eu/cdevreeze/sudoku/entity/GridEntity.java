@@ -18,8 +18,8 @@ package eu.cdevreeze.sudoku.entity;
 
 import jakarta.persistence.*;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Grid JPA entity. Each instance represents a row in the corresponding table.
@@ -36,7 +36,7 @@ public class GridEntity {
     private Long id;
 
     @OneToMany(mappedBy = "grid")
-    private Set<CellEntity> cells = new HashSet<>();
+    private List<CellEntity> cells = new ArrayList<>();
 
     public void addCell(CellEntity cell) {
         cells.add(cell);
@@ -51,11 +51,11 @@ public class GridEntity {
         this.id = id;
     }
 
-    public Set<CellEntity> getCells() {
+    public List<CellEntity> getCells() {
         return cells;
     }
 
-    public void setCells(Set<CellEntity> cells) {
+    public void setCells(List<CellEntity> cells) {
         this.cells = cells;
     }
 }
