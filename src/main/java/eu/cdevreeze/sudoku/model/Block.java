@@ -33,7 +33,7 @@ import java.util.stream.IntStream;
 public record Block(
         int upperLeftRowNumber,
         int upperLeftColumnNumber,
-        ImmutableList<OptionalInt> optionalValues
+        ImmutableList<Cell> cells
 ) implements CellGroup {
 
     public Block {
@@ -41,7 +41,26 @@ public record Block(
         Preconditions.checkArgument(upperLeftColumnNumber >= 0 && upperLeftColumnNumber < Constants.COLUMN_COUNT_IN_GRID);
         Preconditions.checkArgument(upperLeftRowNumber % 3 == 0);
         Preconditions.checkArgument(upperLeftColumnNumber % 3 == 0);
-        Preconditions.checkArgument(optionalValues.size() == Constants.CELL_COUNT_IN_BLOCK);
+
+        Preconditions.checkArgument(
+                cells.stream().map(Cell::withoutId).toList().equals(
+                        extractCells(
+                                upperLeftRowNumber,
+                                upperLeftColumnNumber,
+                                cells.stream().map(Cell::valueOption).toList()
+                        )
+                )
+        );
+    }
+
+    public static Block from(
+            int upperLeftRowNumber,
+            int upperLeftColumnNumber,
+            ImmutableList<OptionalInt> optionalValues
+    ) {
+        ImmutableList<Cell> cells = extractCells(upperLeftRowNumber, upperLeftColumnNumber, optionalValues);
+
+        return new Block(upperLeftRowNumber, upperLeftColumnNumber, ImmutableList.copyOf(cells));
     }
 
     public ImmutableList<Block.Row> blockRows() {
@@ -89,27 +108,33 @@ public record Block(
         return new Block.Column(ImmutableList.copyOf(blockColumnCells));
     }
 
-    /**
-     * Returns the {@link Cell} at the given row and column numbers (0-based).
-     * The database ID of the cell, if any, is lost.
-     */
     public Cell cell(int blockRowNumber, int blockColumnNumber) {
         Preconditions.checkArgument(blockRowNumber >= 0 && blockRowNumber < Constants.ROW_COUNT_IN_BLOCK);
         Preconditions.checkArgument(blockColumnNumber >= 0 && blockColumnNumber < Constants.COLUMN_COUNT_IN_BLOCK);
 
-        return new Cell(
-                OptionalLong.empty(),
-                upperLeftRowNumber + blockRowNumber,
-                upperLeftColumnNumber + blockColumnNumber,
-                optionalValues().get((3 * blockRowNumber) + blockColumnNumber)
-        );
+        return cells.get((3 * blockRowNumber) + blockColumnNumber);
     }
 
-    @Override
-    public ImmutableList<Cell> cells() {
-        return blockRows().stream()
-                .flatMap(blockRow -> blockRow.cells().stream())
-                .collect(ImmutableList.toImmutableList());
+    private static ImmutableList<Cell> extractCells(
+            int upperLeftRowNumber,
+            int upperLeftColumnNumber,
+            List<OptionalInt> optionalValues
+    ) {
+        List<Cell> cells = new ArrayList<>();
+
+        for (int r = 0; r < Constants.ROW_COUNT_IN_BLOCK; r++) {
+            for (int c = 0; c < Constants.COLUMN_COUNT_IN_BLOCK; c++) {
+                Cell cell = new Cell(
+                        OptionalLong.empty(),
+                        upperLeftRowNumber + r,
+                        upperLeftColumnNumber + c,
+                        optionalValues.get((3 * r) + c)
+                );
+                cells.add(cell);
+            }
+        }
+
+        return ImmutableList.copyOf(cells);
     }
 
     public record Row(ImmutableList<Cell> cells) {

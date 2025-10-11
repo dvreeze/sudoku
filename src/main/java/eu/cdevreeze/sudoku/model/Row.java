@@ -28,31 +28,38 @@ import java.util.stream.IntStream;
  *
  * @author Chris de Vreeze
  */
-public record Row(int rowNumber, ImmutableList<OptionalInt> optionalValues) implements CellGroup {
+public record Row(int rowNumber, ImmutableList<Cell> cells) implements CellGroup {
 
     public Row {
         Preconditions.checkArgument(rowNumber >= 0 && rowNumber < Constants.ROW_COUNT_IN_GRID);
+        Preconditions.checkArgument(cells.size() == Constants.COLUMN_COUNT_IN_GRID);
+        Preconditions.checkArgument(
+                cells.stream().map(Cell::cellPosition).toList().equals(
+                        IntStream.range(0, Constants.COLUMN_COUNT_IN_GRID)
+                                .mapToObj(i -> new CellPosition(rowNumber, i))
+                                .toList()
+                )
+        );
+    }
+
+    /**
+     * Creates a {@link Row} from the given row number and optional values.
+     * The cells in the created row have no cell IDs.
+     */
+    public static Row from(int rowNumber, ImmutableList<OptionalInt> optionalValues) {
+        Preconditions.checkArgument(rowNumber >= 0 && rowNumber < Constants.ROW_COUNT_IN_GRID);
         Preconditions.checkArgument(optionalValues.size() == Constants.COLUMN_COUNT_IN_GRID);
-    }
 
-    /**
-     * Returns all {@link Cell} instances, in the correct order.
-     * The database IDs of the cells, if any, are lost.
-     */
-    public ImmutableList<Cell> cells() {
-        return IntStream.range(0, optionalValues().size())
+        ImmutableList<Cell> cells = IntStream.range(0, optionalValues.size())
                 .boxed()
-                .map(idx -> new Cell(OptionalLong.empty(), rowNumber(), idx, optionalValues().get(idx)))
+                .map(idx -> new Cell(OptionalLong.empty(), rowNumber, idx, optionalValues.get(idx)))
                 .collect(ImmutableList.toImmutableList());
+        return new Row(rowNumber, cells);
     }
 
-    /**
-     * Returns the {@link Cell} at the given column number (0-based).
-     * The database ID of the cell, if any, is lost.
-     */
     public Cell cell(int columnNumber) {
         Preconditions.checkArgument(columnNumber >= 0 && columnNumber < Constants.COLUMN_COUNT_IN_GRID);
-        return new Cell(OptionalLong.empty(), rowNumber(), columnNumber, optionalValues().get(columnNumber));
+        return cells.get(columnNumber);
     }
 
     public String show() {

@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import java.util.Map;
+import java.util.OptionalInt;
 
 /**
  * Row, column or block in a Sudoku grid. It always contains 9 cells.
@@ -31,6 +32,13 @@ public sealed interface CellGroup extends CellGroupOrGrid permits Row, Column, B
 
     @Override
     ImmutableList<Cell> cells();
+
+    @Override
+    default ImmutableList<OptionalInt> optionalValues() {
+        return cells().stream()
+                .map(Cell::valueOption)
+                .collect(ImmutableList.toImmutableList());
+    }
 
     @Override
     default boolean isFilled() {

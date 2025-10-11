@@ -51,17 +51,21 @@ public record Grid(OptionalLong idOption, ImmutableList<Row> rows) implements Ce
         List<Row> rows = new ArrayList<>();
 
         for (int row = 0; row < Constants.ROW_COUNT_IN_GRID; row++) {
-            List<OptionalInt> rowCellValues = new ArrayList<>();
+            List<Cell> rowCells = new ArrayList<>();
 
             for (int col = 0; col < Constants.COLUMN_COUNT_IN_GRID; col++) {
-                rowCellValues.add(
+                rowCells.add(
                         Optional.ofNullable(cellsByPos.get(CellPosition.of(row, col)))
-                                .map(Cell::valueOption)
-                                .orElse(OptionalInt.empty())
+                                .orElse(new Cell(
+                                        OptionalLong.empty(),
+                                        row,
+                                        col,
+                                        OptionalInt.empty()
+                                ))
                 );
             }
 
-            rows.add(new Row(row, ImmutableList.copyOf(rowCellValues)));
+            rows.add(new Row(row, ImmutableList.copyOf(rowCells)));
         }
 
         return new Grid(OptionalLong.empty(), ImmutableList.copyOf(rows));
@@ -71,11 +75,11 @@ public record Grid(OptionalLong idOption, ImmutableList<Row> rows) implements Ce
         List<Column> result = new ArrayList<>();
 
         for (int col = 0; col < Constants.COLUMN_COUNT_IN_GRID; col++) {
-            List<OptionalInt> columnCellValues = new ArrayList<>();
+            List<Cell> columnCells = new ArrayList<>();
             for (int row = 0; row < Constants.ROW_COUNT_IN_GRID; row++) {
-                columnCellValues.add(cell(row, col).valueOption());
+                columnCells.add(cell(row, col));
             }
-            result.add(new Column(col, ImmutableList.copyOf(columnCellValues)));
+            result.add(new Column(col, ImmutableList.copyOf(columnCells)));
         }
         return ImmutableList.copyOf(result);
     }
@@ -95,11 +99,11 @@ public record Grid(OptionalLong idOption, ImmutableList<Row> rows) implements Ce
     public Column column(int columnNumber) {
         Preconditions.checkArgument(columnNumber >= 0 && columnNumber < Constants.COLUMN_COUNT_IN_GRID);
 
-        List<OptionalInt> columnCellValues = new ArrayList<>();
+        List<Cell> columnCells = new ArrayList<>();
         for (int row = 0; row < Constants.ROW_COUNT_IN_GRID; row++) {
-            columnCellValues.add(cell(row, columnNumber).valueOption());
+            columnCells.add(cell(row, columnNumber));
         }
-        return new Column(columnNumber, ImmutableList.copyOf(columnCellValues));
+        return new Column(columnNumber, ImmutableList.copyOf(columnCells));
     }
 
     public Block containingBlock(int rowNumber, int columnNumber) {
@@ -189,10 +193,10 @@ public record Grid(OptionalLong idOption, ImmutableList<Row> rows) implements Ce
         Row rowToUpdate = row(pos.rowNumber());
         Row updatedRow = new Row(
                 pos.rowNumber(),
-                ImmutableList.<OptionalInt>builder()
-                        .addAll(rowToUpdate.optionalValues().subList(0, pos.columnNumber()))
-                        .add(valueOption)
-                        .addAll(rowToUpdate.optionalValues().subList(pos.columnNumber() + 1, rowToUpdate.cells().size()))
+                ImmutableList.<Cell>builder()
+                        .addAll(rowToUpdate.cells().subList(0, pos.columnNumber()))
+                        .add(new Cell(OptionalLong.empty(), pos.rowNumber(), pos.columnNumber(), valueOption))
+                        .addAll(rowToUpdate.cells().subList(pos.columnNumber() + 1, rowToUpdate.cells().size()))
                         .build()
         );
         return new Grid(
@@ -237,12 +241,12 @@ public record Grid(OptionalLong idOption, ImmutableList<Row> rows) implements Ce
         Preconditions.checkArgument(rowNumber % 3 == 0);
         Preconditions.checkArgument(columnNumber % 3 == 0);
 
-        List<OptionalInt> optValues = new ArrayList<>();
+        List<Cell> cells = new ArrayList<>();
         for (int x = 0; x < Constants.ROW_COUNT_IN_BLOCK; x++) {
             for (int y = 0; y < Constants.COLUMN_COUNT_IN_BLOCK; y++) {
-                optValues.add(cell(rowNumber + x, columnNumber + y).valueOption());
+                cells.add(cell(rowNumber + x, columnNumber + y));
             }
         }
-        return new Block(rowNumber, columnNumber, ImmutableList.copyOf(optValues));
+        return new Block(rowNumber, columnNumber, ImmutableList.copyOf(cells));
     }
 }

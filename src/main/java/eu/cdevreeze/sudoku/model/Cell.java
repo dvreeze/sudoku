@@ -37,6 +37,15 @@ public record Cell(OptionalLong idOption, int rowNumber, int columnNumber, Optio
         Preconditions.checkArgument(valueOption.stream().allMatch(v -> v >= 1 && v <= 9));
     }
 
+    public Cell withoutId() {
+        return new Cell(
+                OptionalLong.empty(),
+                rowNumber(),
+                columnNumber(),
+                valueOption()
+        );
+    }
+
     public boolean isFilled() {
         return valueOption().isPresent();
     }

@@ -24,7 +24,7 @@ import com.google.common.base.Preconditions;
  *
  * @author Chris de Vreeze
  */
-public record CellPosition(int rowNumber, int columnNumber) {
+public record CellPosition(int rowNumber, int columnNumber) implements Comparable<CellPosition> {
 
     public CellPosition {
         Preconditions.checkArgument(rowNumber >= 0 && rowNumber < Constants.ROW_COUNT_IN_GRID);
@@ -33,5 +33,14 @@ public record CellPosition(int rowNumber, int columnNumber) {
 
     public static CellPosition of(int rowNumber, int columnNumber) {
         return new CellPosition(rowNumber, columnNumber);
+    }
+
+    @Override
+    public int compareTo(CellPosition otherPos) {
+        int rowComparison = Integer.compare(this.rowNumber(), otherPos.rowNumber());
+
+        return rowComparison == 0 ?
+                Integer.compare(this.columnNumber(), otherPos.columnNumber()) :
+                rowComparison;
     }
 }
