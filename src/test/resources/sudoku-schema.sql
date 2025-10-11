@@ -71,6 +71,9 @@ ALTER TABLE ONLY public.cell
 ALTER TABLE ONLY public.cell
     ADD CONSTRAINT cell_grid_id_fkey FOREIGN KEY (grid_id) REFERENCES public.grid(grid_id);
 
+ALTER TABLE ONLY public.cell
+    ADD CONSTRAINT cell_uniq_key UNIQUE (grid_id, cell_id);
+
 CREATE INDEX cell_grid_idx ON public.cell USING btree (grid_id);
 
 --
