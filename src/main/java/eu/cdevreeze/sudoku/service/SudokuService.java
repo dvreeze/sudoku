@@ -46,7 +46,7 @@ public interface SudokuService {
     /**
      * Fill in one empty cell, to proceed with the Sudoku game, storing the result in the database.
      */
-    GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value);
+    GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value, Instant stepTime);
 
     Optional<Grid> findGrid(long gridId);
 

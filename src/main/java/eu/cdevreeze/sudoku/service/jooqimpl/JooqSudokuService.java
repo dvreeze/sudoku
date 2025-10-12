@@ -186,9 +186,7 @@ public class JooqSudokuService implements SudokuService {
 
     @Override
     @Transactional
-    public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value) {
-        Instant now = Instant.now(); // TODO Parameter
-
+    public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value, Instant stepTime) {
         GameHistory gameHistory = findGameHistory(gameHistoryId).orElseThrow();
 
         Preconditions.checkArgument(gameHistory.currentGrid().isStillValid());
@@ -199,7 +197,7 @@ public class JooqSudokuService implements SudokuService {
                 .columns(STEP.GAME_HISTORY_ID, STEP.STEP_TIME, STEP.ROW_NUMBER, STEP.COLUMN_NUMBER, STEP.STEP_VALUE)
                 .values(
                         gameHistory.idOption().orElseThrow(),
-                        now.atOffset(ZoneOffset.UTC),
+                        stepTime.atOffset(ZoneOffset.UTC),
                         pos.rowNumber(),
                         pos.columnNumber(),
                         value

@@ -143,9 +143,7 @@ public class JpaSudokuService implements SudokuService {
 
     @Override
     @Transactional
-    public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value) {
-        Instant now = Instant.now(); // TODO Parameter
-
+    public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value, Instant stepTime) {
         // Query for the JPA entity before updating it
         GameHistoryEntity gameHistoryEntity = findGameHistoryEntity(gameHistoryId).orElseThrow();
 
@@ -163,7 +161,7 @@ public class JpaSudokuService implements SudokuService {
         // Create new JPA entity, filling in retrieved associated data
         StepEntity stepEntity = new StepEntity();
         stepEntity.setGameHistory(gameHistoryEntity);
-        stepEntity.setStepDateTime(now.atOffset(ZoneOffset.UTC));
+        stepEntity.setStepDateTime(stepTime.atOffset(ZoneOffset.UTC));
         stepEntity.setRowNumber(pos.rowNumber());
         stepEntity.setColumnNumber(pos.columnNumber());
         stepEntity.setStepValue(value);

@@ -77,7 +77,8 @@ public class SudokuController {
             @RequestParam(name = "value") int value,
             Model model
     ) {
-        GameHistory gameHistory = sudokuService.fillInEmptyCell(gameHistoryId, CellPosition.of(row, col), value);
+        GameHistory gameHistory =
+                sudokuService.fillInEmptyCell(gameHistoryId, CellPosition.of(row, col), value, Instant.now());
         model.addAttribute("gameHistory", gameHistory);
         model.addAttribute("title", String.format("Sudoku game %s", gameHistory.idOption().orElseThrow()));
 
