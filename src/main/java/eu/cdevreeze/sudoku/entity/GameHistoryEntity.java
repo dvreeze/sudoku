@@ -49,18 +49,6 @@ public class GameHistoryEntity {
     @OneToMany(mappedBy = "gameHistory")
     private List<StepEntity> steps = new ArrayList<>();
 
-    public void addStep(StepEntity step) {
-        steps.add(step);
-    }
-
-    public List<StepEntity> getSteps() {
-        return steps;
-    }
-
-    public void setSteps(List<StepEntity> steps) {
-        this.steps = steps;
-    }
-
     public Long getId() {
         return id;
     }
@@ -91,5 +79,13 @@ public class GameHistoryEntity {
 
     public void setStartTime(OffsetDateTime startTime) {
         this.startTime = startTime;
+    }
+
+    public List<StepEntity> getSteps() {
+        return steps;
+    }
+
+    public void setSteps(List<StepEntity> steps) {
+        this.steps = steps;
     }
 }

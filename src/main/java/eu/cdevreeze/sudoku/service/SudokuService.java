@@ -34,6 +34,7 @@ public interface SudokuService {
     /**
      * Creates a new Sudoku game, storing it in the database.
      * The start grid must not yet exist in the database, and it most have no ID yet.
+     * Its cells must also not yet exist in the database, and they too must have no ID yet.
      */
     Sudoku createSudoku(Grid startGrid);
 

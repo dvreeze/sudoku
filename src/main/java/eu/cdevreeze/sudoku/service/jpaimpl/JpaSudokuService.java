@@ -37,9 +37,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalLong;
+import java.util.*;
 
 /**
  * Implementation of {@link SudokuService} using Jakarta Persistence.
@@ -66,20 +64,45 @@ public class JpaSudokuService implements SudokuService {
     @Transactional
     public Sudoku createSudoku(Grid startGrid) {
         Preconditions.checkArgument(startGrid.idOption().isEmpty());
+        Preconditions.checkArgument(startGrid.cells().stream().allMatch(c -> c.idOption().isEmpty()));
 
-        GridEntity gridEntity = convertToGridEntity(startGrid);
+        // Create new JPA entities, and persist them
+
+        GridEntity gridEntity = new GridEntity();
+
         entityManager.persist(gridEntity);
-        gridEntity.getCells().forEach(entityManager::persist);
+
+        entityManager.flush();
+        entityManager.refresh(gridEntity);
+
+        startGrid.cells().forEach(cell -> {
+            CellEntity cellEntity = new CellEntity();
+            cellEntity.setGrid(gridEntity);
+            cellEntity.setRowNumber(cell.rowNumber());
+            cellEntity.setColumnNumber(cell.columnNumber());
+            cellEntity.setCellValue(cell.valueOption().stream().boxed().findFirst().orElse(null));
+
+            entityManager.persist(cellEntity);
+        });
+
+        entityManager.flush();
+
+        EntityGraph<GridEntity> gridGraph = entityManager.createEntityGraph(GridEntity.class);
+        gridGraph.addAttributeNode(GridEntity_.cells);
+        Map<String, Object> props = Map.of(LOAD_GRAPH_KEY, gridGraph);
+        GridEntity gridEntity2 = entityManager.find(GridEntity.class, gridEntity.getId(), props);
 
         SudokuEntity sudokuEntity = new SudokuEntity();
-        sudokuEntity.setStartGrid(gridEntity);
+        sudokuEntity.setStartGrid(gridEntity2);
 
         entityManager.persist(sudokuEntity);
 
+        // Flush and refresh, to prepare querying again
         entityManager.flush();
         entityManager.refresh(sudokuEntity);
         Objects.requireNonNull(sudokuEntity.getId());
 
+        // Query for the persisted JPA entity with all associations, and return it
         Sudoku sudoku = findSudoku(sudokuEntity.getId()).orElseThrow();
 
         Preconditions.checkArgument(sudoku.idOption().isPresent());
@@ -90,69 +113,75 @@ public class JpaSudokuService implements SudokuService {
     @Override
     @Transactional
     public GameHistory startGame(long sudokuId, String player, Instant startTime) {
-        Sudoku sudoku = findSudoku(sudokuId).orElseThrow();
+        // Query for associated data
+        SudokuEntity sudokuEntity = findSudokuEntity(sudokuId).orElseThrow();
 
-        SudokuEntity sudokuEntity = convertToSudokuEntity(sudoku);
-
+        // Create new JPA entity, filling in retrieved associated data (leaving steps field empty)
         GameHistoryEntity gameHistoryEntity = new GameHistoryEntity();
         gameHistoryEntity.setPlayer(player);
         gameHistoryEntity.setStartTime(startTime.atOffset(ZoneOffset.UTC));
         gameHistoryEntity.setSudoku(sudokuEntity);
+        gameHistoryEntity.setSteps(new ArrayList<>());
 
+        // Persist that new JPA entity (no cascading)
         entityManager.persist(gameHistoryEntity);
 
+        // Flush and refresh, to prepare querying again
         entityManager.flush();
-        entityManager.refresh(gameHistoryEntity);
+        entityManager.refresh(gameHistoryEntity); // Returns ID, and more than that
         Objects.requireNonNull(gameHistoryEntity.getId());
 
+        // Query for the persisted JPA entity with all associations, and return it
         GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
 
         Preconditions.checkArgument(gameHistory.idOption().isPresent());
         Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
         Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
+        Preconditions.checkArgument(gameHistory.isStillValid());
         return gameHistory;
     }
 
     @Override
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value) {
-        GameHistory gameHistory = findGameHistory(gameHistoryId).orElseThrow();
+        // Query for the JPA entity before updating it
+        GameHistoryEntity gameHistoryEntity = findGameHistoryEntity(gameHistoryId).orElseThrow();
 
-        Preconditions.checkArgument(gameHistory.currentGrid().isStillValid());
+        Preconditions.checkArgument(gameHistoryId == Objects.requireNonNull(gameHistoryEntity.getId()));
+        GameHistory tempGameHistory = convertToGameHistoryWithoutIds(gameHistoryEntity);
+        Preconditions.checkArgument(tempGameHistory.currentGrid().isStillValid());
         Preconditions.checkArgument(
-                gameHistory.currentGrid().fillCellIfEmpty(pos, value).stream().anyMatch(Grid::isStillValid));
-
-        GameHistoryEntity gameHistoryEntity = convertToGameHistoryEntity(gameHistory);
-
-        StepEntity stepEntity = new StepEntity();
-        stepEntity.setStepKey(
-                new StepEntityKey(
-                        gameHistoryId,
-                        1 + gameHistory.steps()
-                                .stream()
-                                .flatMap(step -> step.stepKeyOption().stream())
-                                .map(StepKey::stepSeqNumber)
-                                .mapToInt(v -> v)
-                                .max()
-                                .orElse(0)
-                )
+                tempGameHistory
+                        .currentGrid()
+                        .fillCellIfEmpty(pos, value)
+                        .stream()
+                        .anyMatch(Grid::isStillValid)
         );
+
+        // Create new JPA entity, filling in retrieved associated data
+        StepEntity stepEntity = new StepEntity();
+        stepEntity.setGameHistory(gameHistoryEntity);
+        stepEntity.setStepSeqNumber(1 + retrieveMaxStepSeqNumberOfGame(gameHistoryId));
         stepEntity.setRowNumber(pos.rowNumber());
         stepEntity.setColumnNumber(pos.columnNumber());
         stepEntity.setStepValue(value);
 
+        // Persist that new JPA entity (no cascading)
         entityManager.persist(stepEntity);
 
+        // Flush and refresh, to prepare querying again
         entityManager.flush();
         entityManager.refresh(gameHistoryEntity);
         Objects.requireNonNull(gameHistoryEntity.getId());
 
-        GameHistory gameHistory2 = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
+        // Query for the persisted JPA entity with all associations, and return it
+        GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
 
-        Preconditions.checkArgument(gameHistory2.idOption().isPresent());
-        Preconditions.checkArgument(gameHistory2.sudoku().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory2.sudoku().startGrid().idOption().isPresent());
-        return gameHistory2;
+        Preconditions.checkArgument(gameHistory.idOption().isPresent());
+        Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
+        Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
+        Preconditions.checkArgument(gameHistory.isStillValid());
+        return gameHistory;
     }
 
     @Override
@@ -161,6 +190,30 @@ public class JpaSudokuService implements SudokuService {
         Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
         System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
 
+        return findGridEntity(gridId).map(this::convertToGrid);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Sudoku> findSudoku(long sudokuId) {
+        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+
+        return findSudokuEntity(sudokuId).map(this::convertToSudoku);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<GameHistory> findGameHistory(long gameHistoryId) {
+        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+
+        return findGameHistoryEntity(gameHistoryId).map(this::convertToGameHistory);
+    }
+
+    // Private query methods
+
+    private Optional<GridEntity> findGridEntity(long gridId) {
         // First build up the query (without worrying about the load/fetch graph)
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<GridEntity> cq = cb.createQuery(GridEntity.class);
@@ -175,23 +228,17 @@ public class JpaSudokuService implements SudokuService {
         gridGraph.addAttributeNode(GridEntity_.cells);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context
+        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return entityManager.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, gridGraph)
                 .getResultList()
                 .stream()
-                .map(this::convertToGrid)
                 .findFirst();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<Sudoku> findSudoku(long sudokuId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
-
+    private Optional<SudokuEntity> findSudokuEntity(long sudokuId) {
         // First build up the query (without worrying about the load/fetch graph)
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<SudokuEntity> cq = cb.createQuery(SudokuEntity.class);
@@ -208,46 +255,35 @@ public class JpaSudokuService implements SudokuService {
         gridSubgraph.addAttributeNode(GridEntity_.cells);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context
+        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return entityManager.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, sudokuGraph)
                 .getResultList()
                 .stream()
-                .map(this::convertToSudoku)
                 .findFirst();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<GameHistory> findGameHistory(long gameHistoryId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
-
+    private Optional<GameHistoryEntity> findGameHistoryEntity(long gameHistoryId) {
         // Avoiding a cartesian product ("MultiBagFetchException") by using 2 criteria queries
 
-        Optional<GameHistory> partialGameHistoryOption = findGameHistoryWithoutGridCells(gameHistoryId);
+        Optional<GameHistoryEntity> partialGameHistoryOption = findGameHistoryEntityWithoutGridCells(gameHistoryId);
 
-        Optional<Sudoku> sudokuOption = partialGameHistoryOption.map(GameHistory::sudoku);
+        // Seems to retrieve the Sudoku twice, once implicitly and once explicitly
+        Optional<SudokuEntity> sudokuOption = partialGameHistoryOption.flatMap(gameHist ->
+                findSudokuEntity(Objects.requireNonNull(gameHist.getSudoku().getId()))
+        );
 
         return partialGameHistoryOption
                 .flatMap(gameHist ->
-                        sudokuOption.map(sudoku -> new GameHistory(
-                                gameHist.idOption(),
-                                gameHist.player(),
-                                gameHist.startTime(),
-                                sudoku,
-                                gameHist.steps()
-                        )));
+                        sudokuOption.map(sudoku -> {
+                            gameHist.setSudoku(sudoku);
+                            return gameHist;
+                        }));
     }
 
-    // Private query methods
-
-    private Optional<GameHistory> findGameHistoryWithoutGridCells(long gameHistoryId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
-
+    private Optional<GameHistoryEntity> findGameHistoryEntityWithoutGridCells(long gameHistoryId) {
         // First build up the query (without worrying about the load/fetch graph)
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<GameHistoryEntity> cq = cb.createQuery(GameHistoryEntity.class);
@@ -265,20 +301,40 @@ public class JpaSudokuService implements SudokuService {
         sudokuSubgraph.addAttributeNode(SudokuEntity_.startGrid);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context
+        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return entityManager.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, gameHistoryGraph)
                 .getResultList()
                 .stream()
-                .map(this::convertToGameHistory)
                 .findFirst();
     }
 
+    // TODO Step creation time instead of sequence number
+    private int retrieveMaxStepSeqNumberOfGame(long gameHistoryId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Integer> cq = cb.createQuery(Integer.class);
+
+        Root<StepEntity> stepEntityRoot = cq.from(StepEntity.class);
+        cq.where(cb.equal(stepEntityRoot.get(StepEntity_.gameHistory).get(GameHistoryEntity_.id), gameHistoryId));
+        cq.select(
+                cb.coalesce(cb.max(stepEntityRoot.get(StepEntity_.stepSeqNumber)), 0)
+        );
+
+        return Optional.of(
+                entityManager.createQuery(cq).getSingleResult()
+        ).orElse(0);
+    }
+
     // Private conversion methods, encapsulating assumptions about loaded associations
+    // The conversions from JPA entities to model objects should be rather safe, but expect fully filled data, unless specified otherwise
+    // Note that there are only conversions from JPA entities to model objects, and not the other way around
 
     private Grid convertToGrid(GridEntity gridEntity) {
+        Preconditions.checkArgument(gridEntity.getId() != null);
+        Preconditions.checkArgument(gridEntity.getCells().stream().allMatch(c -> c.getId() != null));
+
         return Grid.fromCells(
                 gridEntity.getCells()
                         .stream()
@@ -292,14 +348,42 @@ public class JpaSudokuService implements SudokuService {
         ).withId(gridEntity.getId());
     }
 
+    private Grid convertToGridWithoutIds(GridEntity gridEntity) {
+        return Grid.fromCells(
+                gridEntity.getCells()
+                        .stream()
+                        .map(cell -> new Cell(
+                                OptionalLong.empty(),
+                                cell.getRowNumber(),
+                                cell.getColumnNumber(),
+                                Optional.ofNullable(cell.getCellValue()).stream().mapToInt(v -> v).findFirst()
+                        ))
+                        .collect(ImmutableSet.toImmutableSet())
+        );
+    }
+
     private Sudoku convertToSudoku(SudokuEntity sudokuEntity) {
+        Preconditions.checkArgument(sudokuEntity.getId() != null);
+        Preconditions.checkArgument(sudokuEntity.getStartGrid() != null);
+
         return new Sudoku(
                 OptionalLong.of(sudokuEntity.getId()),
                 convertToGrid(sudokuEntity.getStartGrid())
         );
     }
 
+    private Sudoku convertToSudokuWithoutIds(SudokuEntity sudokuEntity) {
+        return new Sudoku(
+                OptionalLong.empty(),
+                convertToGridWithoutIds(sudokuEntity.getStartGrid())
+        );
+    }
+
     private GameHistory convertToGameHistory(GameHistoryEntity gameHistoryEntity) {
+        Preconditions.checkArgument(gameHistoryEntity.getId() != null);
+        Preconditions.checkArgument(gameHistoryEntity.getSudoku() != null);
+        Preconditions.checkArgument(gameHistoryEntity.getSteps() != null);
+
         return new GameHistory(
                 OptionalLong.of(gameHistoryEntity.getId()),
                 gameHistoryEntity.getPlayer(),
@@ -320,44 +404,21 @@ public class JpaSudokuService implements SudokuService {
         );
     }
 
-    private GridEntity convertToGridEntity(Grid grid) {
-        GridEntity gridEntity = new GridEntity();
-        grid.idOption().ifPresent(gridEntity::setId);
-        grid.cells().forEach(cell -> {
-            CellEntity cellEntity = new CellEntity();
-            cellEntity.setRowNumber(cell.rowNumber());
-            cellEntity.setColumnNumber(cell.columnNumber());
-            cellEntity.setCellValue(cell.valueOption().stream().boxed().findFirst().orElse(null));
-            gridEntity.addCell(cellEntity);
-        });
-        return gridEntity;
-    }
-
-    private SudokuEntity convertToSudokuEntity(Sudoku sudoku) {
-        SudokuEntity sudokuEntity = new SudokuEntity();
-        sudoku.idOption().ifPresent(sudokuEntity::setId);
-        sudokuEntity.setStartGrid(convertToGridEntity(sudoku.startGrid()));
-        return sudokuEntity;
-    }
-
-    private GameHistoryEntity convertToGameHistoryEntity(GameHistory gameHistory) {
-        GameHistoryEntity gameHistoryEntity = new GameHistoryEntity();
-        gameHistory.idOption().ifPresent(gameHistoryEntity::setId);
-        gameHistoryEntity.setPlayer(gameHistoryEntity.getPlayer());
-        gameHistoryEntity.setStartTime(gameHistory.startTime().atOffset(ZoneOffset.UTC));
-        gameHistoryEntity.setSudoku(convertToSudokuEntity(gameHistory.sudoku()));
-        gameHistory.steps().forEach(step -> {
-            StepEntity stepEntity = new StepEntity();
-            gameHistory.idOption().ifPresent(gameHistoryId ->
-                    stepEntity.setStepKey(
-                            new StepEntityKey(gameHistoryId, step.stepKeyOption().orElseThrow().stepSeqNumber())
-                    )
-            );
-            stepEntity.setRowNumber(step.rowNumber());
-            stepEntity.setColumnNumber(step.columnNumber());
-            stepEntity.setStepValue(step.value());
-            gameHistoryEntity.addStep(stepEntity);
-        });
-        return gameHistoryEntity;
+    private GameHistory convertToGameHistoryWithoutIds(GameHistoryEntity gameHistoryEntity) {
+        return new GameHistory(
+                OptionalLong.empty(),
+                gameHistoryEntity.getPlayer(),
+                gameHistoryEntity.getStartTime().toInstant(),
+                convertToSudokuWithoutIds(gameHistoryEntity.getSudoku()),
+                gameHistoryEntity.getSteps()
+                        .stream()
+                        .map(step -> new Step(
+                                Optional.empty(),
+                                step.getRowNumber(),
+                                step.getColumnNumber(),
+                                step.getStepValue()
+                        ))
+                        .collect(ImmutableList.toImmutableList())
+        );
     }
 }

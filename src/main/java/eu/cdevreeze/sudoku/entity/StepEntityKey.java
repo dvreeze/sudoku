@@ -16,13 +16,41 @@
 
 package eu.cdevreeze.sudoku.entity;
 
-import jakarta.persistence.Embeddable;
+import java.io.Serializable;
 
 /**
- * Composite Step key.
+ * Composite Step key, to be used as an {@link jakarta.persistence.IdClass}.
+ * Note that the key contains an associated entity.
  *
  * @author Chris de Vreeze
  */
-@Embeddable
-public record StepEntityKey(Long gameHistoryId, Integer stepSeqNumber) {
+public class StepEntityKey implements Serializable {
+
+    private GameHistoryEntity gameHistory;
+
+    private Integer stepSeqNumber;
+
+    public StepEntityKey() {
+    }
+
+    public StepEntityKey(GameHistoryEntity gameHistory, Integer stepSeqNumber) {
+        this.gameHistory = gameHistory;
+        this.stepSeqNumber = stepSeqNumber;
+    }
+
+    public GameHistoryEntity getGameHistory() {
+        return gameHistory;
+    }
+
+    public void setGameHistory(GameHistoryEntity gameHistory) {
+        this.gameHistory = gameHistory;
+    }
+
+    public Integer getStepSeqNumber() {
+        return stepSeqNumber;
+    }
+
+    public void setStepSeqNumber(Integer stepSeqNumber) {
+        this.stepSeqNumber = stepSeqNumber;
+    }
 }

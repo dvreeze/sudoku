@@ -16,6 +16,7 @@
 
 package eu.cdevreeze.sudoku.entity;
 
+import com.google.common.base.Preconditions;
 import jakarta.persistence.*;
 
 /**
@@ -24,15 +25,17 @@ import jakarta.persistence.*;
  * @author Chris de Vreeze
  */
 @Entity(name = "Step")
+@IdClass(StepEntityKey.class)
 public class StepEntity {
 
-    @EmbeddedId
-    private StepEntityKey stepKey;
-
-    @MapsId("gameHistoryId")
+    @Id
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "game_history_id", nullable = false)
     private GameHistoryEntity gameHistory;
+
+    @Id
+    @Column(name = "step_seq_number", nullable = false)
+    private Integer stepSeqNumber;
 
     @Column(name = "row_number", nullable = false, columnDefinition = "ROW_IDX")
     private Integer rowNumber;
@@ -44,19 +47,25 @@ public class StepEntity {
     private Integer stepValue;
 
     public StepEntityKey getStepKey() {
-        return stepKey;
+        Preconditions.checkArgument(gameHistory != null);
+        Preconditions.checkArgument(stepSeqNumber != null);
+        return new StepEntityKey(gameHistory, stepSeqNumber);
     }
 
-    public void setStepKey(StepEntityKey stepKey) {
-        this.stepKey = stepKey;
+    public GameHistoryEntity getGameHistory() {
+        return gameHistory;
     }
 
-    public Long getGameHistoryId() {
-        return stepKey.gameHistoryId();
+    public void setGameHistory(GameHistoryEntity gameHistory) {
+        this.gameHistory = gameHistory;
     }
 
     public Integer getStepSeqNumber() {
-        return stepKey.stepSeqNumber();
+        return stepSeqNumber;
+    }
+
+    public void setStepSeqNumber(Integer stepSeqNumber) {
+        this.stepSeqNumber = stepSeqNumber;
     }
 
     public Integer getRowNumber() {
