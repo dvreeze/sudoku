@@ -19,6 +19,8 @@ package eu.cdevreeze.sudoku.entity;
 import com.google.common.base.Preconditions;
 import jakarta.persistence.*;
 
+import java.time.OffsetDateTime;
+
 /**
  * Step JPA entity. Each instance represents a row in the corresponding table.
  *
@@ -34,8 +36,8 @@ public class StepEntity {
     private GameHistoryEntity gameHistory;
 
     @Id
-    @Column(name = "step_seq_number", nullable = false)
-    private Integer stepSeqNumber;
+    @Column(name = "step_time", nullable = false)
+    private OffsetDateTime stepDateTime;
 
     @Column(name = "row_number", nullable = false, columnDefinition = "ROW_IDX")
     private Integer rowNumber;
@@ -48,8 +50,8 @@ public class StepEntity {
 
     public StepEntityKey getStepKey() {
         Preconditions.checkArgument(gameHistory != null);
-        Preconditions.checkArgument(stepSeqNumber != null);
-        return new StepEntityKey(gameHistory, stepSeqNumber);
+        Preconditions.checkArgument(stepDateTime != null);
+        return new StepEntityKey(gameHistory, stepDateTime);
     }
 
     public GameHistoryEntity getGameHistory() {
@@ -60,12 +62,12 @@ public class StepEntity {
         this.gameHistory = gameHistory;
     }
 
-    public Integer getStepSeqNumber() {
-        return stepSeqNumber;
+    public OffsetDateTime getStepDateTime() {
+        return stepDateTime;
     }
 
-    public void setStepSeqNumber(Integer stepSeqNumber) {
-        this.stepSeqNumber = stepSeqNumber;
+    public void setStepDateTime(OffsetDateTime stepDateTime) {
+        this.stepDateTime = stepDateTime;
     }
 
     public Integer getRowNumber() {

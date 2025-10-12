@@ -17,6 +17,7 @@
 package eu.cdevreeze.sudoku.entity;
 
 import java.io.Serializable;
+import java.time.OffsetDateTime;
 
 /**
  * Composite Step key, to be used as an {@link jakarta.persistence.IdClass}.
@@ -28,14 +29,14 @@ public class StepEntityKey implements Serializable {
 
     private GameHistoryEntity gameHistory;
 
-    private Integer stepSeqNumber;
+    private OffsetDateTime stepDateTime;
 
     public StepEntityKey() {
     }
 
-    public StepEntityKey(GameHistoryEntity gameHistory, Integer stepSeqNumber) {
+    public StepEntityKey(GameHistoryEntity gameHistory, OffsetDateTime stepDateTime) {
         this.gameHistory = gameHistory;
-        this.stepSeqNumber = stepSeqNumber;
+        this.stepDateTime = stepDateTime;
     }
 
     public GameHistoryEntity getGameHistory() {
@@ -46,11 +47,11 @@ public class StepEntityKey implements Serializable {
         this.gameHistory = gameHistory;
     }
 
-    public Integer getStepSeqNumber() {
-        return stepSeqNumber;
+    public OffsetDateTime getStepDateTime() {
+        return stepDateTime;
     }
 
-    public void setStepSeqNumber(Integer stepSeqNumber) {
-        this.stepSeqNumber = stepSeqNumber;
+    public void setStepDateTime(OffsetDateTime stepDateTime) {
+        this.stepDateTime = stepDateTime;
     }
 }

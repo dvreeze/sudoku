@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.stream.Gatherers;
@@ -38,6 +39,10 @@ public record GameHistory(
         ImmutableList<Step> steps) {
 
     public GameHistory {
+        Preconditions.checkArgument(
+                steps.stream().sorted(Comparator.comparing(Step::stepKey)).toList()
+                        .equals(steps)
+        );
         gridHistory(sudoku.startGrid(), steps);
     }
 

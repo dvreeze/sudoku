@@ -18,15 +18,13 @@ package eu.cdevreeze.sudoku.model;
 
 import com.google.common.base.Preconditions;
 
-import java.util.Optional;
-
 /**
  * One step in a Sudoku game. The row and column numbers are coordinates in the grid, and not relative
  * coordinates in a block (that would be relative to the left upper corner of the block).
  *
  * @author Chris de Vreeze
  */
-public record Step(Optional<StepKey> stepKeyOption, int rowNumber, int columnNumber, int value) {
+public record Step(StepKey stepKey, int rowNumber, int columnNumber, int value) {
 
     public Step {
         Preconditions.checkArgument(rowNumber >= 0);

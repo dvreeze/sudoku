@@ -16,16 +16,20 @@
 
 package eu.cdevreeze.sudoku.model;
 
-import com.google.common.base.Preconditions;
+import java.time.Instant;
 
 /**
  * Composite Step key.
  *
  * @author Chris de Vreeze
  */
-public record StepKey(long gameHistoryId, int stepSeqNumber) {
+public record StepKey(long gameHistoryId, Instant stepDateTime) implements Comparable<StepKey> {
 
-    public StepKey {
-        Preconditions.checkArgument(stepSeqNumber >= 1);
+    @Override
+    public int compareTo(StepKey otherStepKey) {
+        int gameHistoryIdComparison = Long.compare(gameHistoryId(), otherStepKey.gameHistoryId());
+        return gameHistoryIdComparison == 0 ?
+                stepDateTime().compareTo(otherStepKey.stepDateTime()) :
+                gameHistoryIdComparison;
     }
 }

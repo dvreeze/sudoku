@@ -144,6 +144,8 @@ public class JpaSudokuService implements SudokuService {
     @Override
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value) {
+        Instant now = Instant.now(); // TODO Parameter
+
         // Query for the JPA entity before updating it
         GameHistoryEntity gameHistoryEntity = findGameHistoryEntity(gameHistoryId).orElseThrow();
 
@@ -161,7 +163,7 @@ public class JpaSudokuService implements SudokuService {
         // Create new JPA entity, filling in retrieved associated data
         StepEntity stepEntity = new StepEntity();
         stepEntity.setGameHistory(gameHistoryEntity);
-        stepEntity.setStepSeqNumber(1 + retrieveMaxStepSeqNumberOfGame(gameHistoryId));
+        stepEntity.setStepDateTime(now.atOffset(ZoneOffset.UTC));
         stepEntity.setRowNumber(pos.rowNumber());
         stepEntity.setColumnNumber(pos.columnNumber());
         stepEntity.setStepValue(value);
@@ -311,22 +313,6 @@ public class JpaSudokuService implements SudokuService {
                 .findFirst();
     }
 
-    // TODO Step creation time instead of sequence number
-    private int retrieveMaxStepSeqNumberOfGame(long gameHistoryId) {
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Integer> cq = cb.createQuery(Integer.class);
-
-        Root<StepEntity> stepEntityRoot = cq.from(StepEntity.class);
-        cq.where(cb.equal(stepEntityRoot.get(StepEntity_.gameHistory).get(GameHistoryEntity_.id), gameHistoryId));
-        cq.select(
-                cb.coalesce(cb.max(stepEntityRoot.get(StepEntity_.stepSeqNumber)), 0)
-        );
-
-        return Optional.of(
-                entityManager.createQuery(cq).getSingleResult()
-        ).orElse(0);
-    }
-
     // Private conversion methods, encapsulating assumptions about loaded associations
     // The conversions from JPA entities to model objects should be rather safe, but expect fully filled data, unless specified otherwise
     // Note that there are only conversions from JPA entities to model objects, and not the other way around
@@ -392,10 +378,10 @@ public class JpaSudokuService implements SudokuService {
                 gameHistoryEntity.getSteps()
                         .stream()
                         .map(step -> new Step(
-                                Optional.of(new StepKey(
+                                new StepKey(
                                         gameHistoryEntity.getId(),
-                                        step.getStepSeqNumber()
-                                )),
+                                        step.getStepDateTime().toInstant()
+                                ),
                                 step.getRowNumber(),
                                 step.getColumnNumber(),
                                 step.getStepValue()
@@ -413,7 +399,7 @@ public class JpaSudokuService implements SudokuService {
                 gameHistoryEntity.getSteps()
                         .stream()
                         .map(step -> new Step(
-                                Optional.empty(),
+                                new StepKey(0, step.getStepDateTime().toInstant()), // Cheating a bit
                                 step.getRowNumber(),
                                 step.getColumnNumber(),
                                 step.getStepValue()

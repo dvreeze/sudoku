@@ -136,7 +136,7 @@ ALTER TABLE ONLY public.game_history
 
 CREATE TABLE public.step (
     game_history_id bigint NOT NULL,
-    step_seq_number integer NOT NULL,
+    step_time timestamp with time zone DEFAULT now() NOT NULL,
     row_number row_idx NOT NULL,
     column_number col_idx NOT NULL,
     step_value digit NOT NULL
@@ -145,7 +145,7 @@ CREATE TABLE public.step (
 ALTER TABLE public.step OWNER TO postgres;
 
 ALTER TABLE ONLY public.step
-    ADD CONSTRAINT step_pkey PRIMARY KEY (game_history_id, step_seq_number);
+    ADD CONSTRAINT step_pkey PRIMARY KEY (game_history_id, step_time);
 
 ALTER TABLE ONLY public.step
     ADD CONSTRAINT step_game_history_id_fkey FOREIGN KEY (game_history_id) REFERENCES public.game_history(game_history_id);

@@ -91,7 +91,7 @@ public class JooqSudokuService implements SudokuService {
 
     private record StepTableRow(
             Long gameHistoryId,
-            Integer stepSeqNumber,
+            OffsetDateTime stepDateTime,
             Integer rowNumber,
             Integer columnNumber,
             Integer stepValue
@@ -99,7 +99,7 @@ public class JooqSudokuService implements SudokuService {
 
         public Step toStep() {
             return new Step(
-                    Optional.of(new StepKey(gameHistoryId, stepSeqNumber)),
+                    new StepKey(gameHistoryId, stepDateTime().toInstant()),
                     rowNumber(),
                     columnNumber(),
                     stepValue
@@ -187,6 +187,8 @@ public class JooqSudokuService implements SudokuService {
     @Override
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value) {
+        Instant now = Instant.now(); // TODO Parameter
+
         GameHistory gameHistory = findGameHistory(gameHistoryId).orElseThrow();
 
         Preconditions.checkArgument(gameHistory.currentGrid().isStillValid());
@@ -194,15 +196,10 @@ public class JooqSudokuService implements SudokuService {
                 gameHistory.currentGrid().fillCellIfEmpty(pos, value).stream().anyMatch(Grid::isStillValid));
 
         StepRecord stepRecord = dsl.insertInto(STEP)
-                .columns(STEP.GAME_HISTORY_ID, STEP.STEP_SEQ_NUMBER, STEP.ROW_NUMBER, STEP.COLUMN_NUMBER, STEP.STEP_VALUE)
+                .columns(STEP.GAME_HISTORY_ID, STEP.STEP_TIME, STEP.ROW_NUMBER, STEP.COLUMN_NUMBER, STEP.STEP_VALUE)
                 .values(
                         gameHistory.idOption().orElseThrow(),
-                        1 + Objects.requireNonNull(
-                                dsl.select(coalesce(max(STEP.STEP_SEQ_NUMBER), 0))
-                                        .from(STEP)
-                                        .where(STEP.GAME_HISTORY_ID.eq(gameHistoryId))
-                                        .fetchOne()
-                        ).value1(),
+                        now.atOffset(ZoneOffset.UTC),
                         pos.rowNumber(),
                         pos.columnNumber(),
                         value
@@ -220,7 +217,7 @@ public class JooqSudokuService implements SudokuService {
                         .addAll(gameHistory.steps())
                         .add(
                                 new Step(
-                                        Optional.of(new StepKey(stepRecord.getGameHistoryId(), stepRecord.getStepSeqNumber())),
+                                        new StepKey(stepRecord.getGameHistoryId(), stepRecord.getStepTime().toInstant()),
                                         stepRecord.getRowNumber(),
                                         stepRecord.getColumnNumber(),
                                         stepRecord.getStepValue()
@@ -311,13 +308,13 @@ public class JooqSudokuService implements SudokuService {
                         multiset(
                                 select(
                                         STEP.GAME_HISTORY_ID,
-                                        STEP.STEP_SEQ_NUMBER,
+                                        STEP.STEP_TIME,
                                         STEP.ROW_NUMBER,
                                         STEP.COLUMN_NUMBER,
                                         STEP.STEP_VALUE
                                 ).from(STEP)
                                         .where(STEP.GAME_HISTORY_ID.eq(GAME_HISTORY.GAME_HISTORY_ID))
-                                        .orderBy(STEP.STEP_SEQ_NUMBER)
+                                        .orderBy(STEP.STEP_TIME)
                         ).convertFrom(r -> r.map(Records.mapping(StepTableRow::new)))
                 )
                 .from(GAME_HISTORY)
