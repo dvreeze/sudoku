@@ -2,9 +2,10 @@
 COPY public.grid (grid_id) FROM stdin;
 1
 2
+3
 \.
 
-SELECT pg_catalog.setval('public.grid_id_seq', 2, true);
+SELECT pg_catalog.setval('public.grid_id_seq', 3, true);
 
 COPY public.cell (cell_id, grid_id, row_number, column_number, cell_value) FROM stdin;
 1	1	0	1	1
@@ -68,11 +69,51 @@ COPY public.cell (cell_id, grid_id, row_number, column_number, cell_value) FROM 
 56	2	8	7	7
 \.
 
-SELECT pg_catalog.setval('public.cell_id_seq', 56, true);
+COPY public.cell (cell_id, grid_id, row_number, column_number, cell_value) FROM stdin;
+57	3	0	6	7
+58	3	1	0	3
+59	3	1	1	9
+60	3	1	3	7
+61	3	1	5	8
+62	3	1	6	5
+63	3	1	7	4
+64	3	2	0	8
+65	3	2	1	6
+66	3	2	4	5
+67	3	2	5	4
+68	3	3	0	9
+69	3	3	2	6
+70	3	3	4	4
+71	3	3	5	7
+72	3	4	0	1
+73	3	4	1	3
+74	3	4	2	4
+75	3	4	3	2
+76	3	4	7	9
+77	3	5	1	5
+78	3	5	2	8
+79	3	5	3	1
+80	3	5	5	9
+81	3	5	8	4
+82	3	6	0	5
+83	3	6	1	4
+84	3	6	3	9
+85	3	6	4	2
+86	3	6	5	3
+87	3	6	8	8
+88	3	7	4	7
+89	3	7	6	9
+90	3	7	8	5
+91	3	8	5	1
+92	3	8	7	3
+\.
+
+SELECT pg_catalog.setval('public.cell_id_seq', 92, true);
 
 COPY public.sudoku (sudoku_id, start_grid_id) FROM stdin;
 1	1
 2	2
+3	3
 \.
 
-SELECT pg_catalog.setval('public.sudoku_id_seq', 2, true);
+SELECT pg_catalog.setval('public.sudoku_id_seq', 3, true);
