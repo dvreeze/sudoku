@@ -182,5 +182,16 @@ That is, service layer methods return "data objects", but these data objects the
 or indirectly) call service layer methods. This way it becomes more clear where the performance costs are,
 where transactional boundaries are, etc.
 
+One last note about these immutable model classes:
+* they should depend on nothing else in the code base
+  * that is, JPA entities depend on immutable model classes for conversions from JPA to immutable model
+  * but not the other way around; the model knows nothing about JPA
+* often we want to expose model data as JSON, XML etc.
+  * consider introducing separate classes for those concerns
+  * recall the *single responsibility* principle in *SOLID*
+  * for example, a JPA entity is a *Java representation of a database table row*, no more, no less
+  * and a JAXB-annotated class is a *Java representation of XML data*, etc.
+  * mixing these concerns in the same data class quickly becomes a mess
+
 ## Using jOOQ where JPA/Hibernate offers less value
 
