@@ -175,7 +175,7 @@ Hence, in my opinion a *service layer* in a large Java code base using Hibernate
 boundary:
 * *Java interfaces* for the abstract service layer API contracts
 * the abstract methods in these Java interfaces take and return *immutable data*, such as *immutable Java records*
-  * to help enforce immutability of these Java records, *Guava immutable collections* are a good fit
+  * to help enforce immutability of these Java records, *Guava immutable collections* are a good fit for collection-valued fields
 
 Making this service layer contract quite visible also helps in enforcing "proper" application layering.
 That is, service layer methods return "data objects", but these data objects themselves do not (directly
