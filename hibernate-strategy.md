@@ -111,6 +111,76 @@ this helps find many small programming errors as early as possible, which is a g
 
 ## Using service interfaces, and passing data around as immutable Java records
 
+Typically, large Java web applications have a *service layer* that hides database access details and other
+service implementation details from higher layers using the service layer, such as the "web layer".
+
+In particular at the service layer boundary it makes sense to use *Java interfaces* without any implementation
+code as *purely abstract service layer API*. Preferably this API is completely technology-agnostic. That
+would also mean it should not take or return JPA entities in its service methods. More about that follows
+below.
+
+With a service layer contract as Java interface it becomes quite natural to mock the service layer in
+unit tests of higher layer code (such as code in the "web layer"). Mocking concrete service implementations feels
+like a hack, whereas mocking service interfaces clearly does not.
+
+Yet what kind of "data classes" should service methods (take and) return? Besides being bound to
+technology (namely, JPA) *JPA entities* are quite poor *data transfer objects*. Recall Joshua Bloch's
+*Effective Java, 3rd Edition*, and the item on *minimizing mutability*. As Joshua Bloch clearly shows,
+immutability or at least minimizing mutability makes *reasoning about code* much easier, leading to
+far fewer bugs. This advice also applies to "data classes". Let's see how *JPA entities* do in this
+regard:
+* they are highly mutable, so harder to reason about (w.r.t. their "state space")
+* they typically allow for `null` to be used for all fields
+* they can lead to the dreaded [`LazyInitializationException`](https://thorben-janssen.com/lazyinitializationexception/)
+* they make use of [Hibernate proxies](https://thorben-janssen.com/hibernate-proxies/), thus hiding the real JPA entity
+* they certainly are not thread-safe, although sometimes that would be a desirable property
+* they are not technology-agnostic
+* in practice, they often tend to "attract" the use of legacy APIs such as the mutable `java.util.Date`
+* defining *equality* (through overriding of `equals` and `hashCode`) can be a challenge for these mutable data structures
+* this programming style is rooted in old-school *imperative Java programming*, characterized by "mutability and side effects everywhere"
+
+In my opinion it is well worth the effort to keep JPA entities local to "database access code",
+and convert them to *(deeply) immutable Java records*. Again, remember the advice from *Effective Java*
+on *minimizing mutability*. Such "data classes" have the following characteristics:
+* they are (deeply) *immutable*, so have just one possible state, and are therefore quite easy to reason about
+* they tend to use the type-safe `java.util.Optional` rather than `null` to describe optional data fields
+* they even tend to "attract" the now de-facto standard [JSpecify annotations](https://jspecify.dev/) to help keep `null` away as much as possible
+* they "attract" the immutable Guava collections such as `ImmutableList` and `ImmutableSet`, in order to explicitly promise immutability
+  * note that these immutable Guava collections are "regular" *Java collections*, with stronger immutability guarantees than "unmodifiable collections"
+* they do *not use any proxies*, so what you see is what you get, and there is no hidden state
+* they are *thread-safe* (if all of their record components are immutable as well)
+* they are technology-agnostic, just like the abstract service layer Java interfaces passing them around
+* in practice, they tend to "attract" modern Java APIs (that use immutable data structures), such as `java.time.Instant`
+  * just compare `java.util.Date` and `java.util.Calendar` on the one hand with the *Java time API* on the other hand; it's no contest, really
+* out of the box, they offer natural *value equality* (through provided overridden `equals` and `hashCode` methods)
+* this programming style is rooted in modern *functional Java programming*, characterized by "immutability preferred, and side effects minimized/localized"
+  * there is a clear influence from OO/FP languages like *Scala*, which showed that OO is not about mutability, and that OO and FP go well together
+
+Maybe this is not a big deal in a small code base, but in a large code base this makes a big difference
+in maintainability and low bug counts.
+
+Yet where do we convert JPA entities to immutable Java records? One possibility is to do that within the
+open `EntityManager`. We could turn "result sets" directly into Java records, or we could convert
+JPA entities into Java records while still in an open `EntityManager`. The latter comes with some overhead
+of unnecessarily filling the first-level cache, but it can make conversion from JPA entity trees to
+Java records easy, if we have some custom (`private`) methods turning JPA entities (of which we know
+to what extent associations have been fetched) into immutable Java records.
+
+I have tried out the latter approach several times now, also in this project, and it works well, in my
+opinion. A gotcha may be that I did not always see this work well when calling method `TypedQuery.getResultStream`.
+When calling `TypedQuery.getResultList`, and then converting the JPA entity result `List` into a
+collection of Java records (through a "Java Stream pipeline"), I haven't seen any data loss so far.
+
+Hence, in my opinion a *service layer* in a large Java code base using Hibernate looks like this at the
+boundary:
+* *Java interfaces* for the abstract service layer API contracts
+* the abstract methods in these Java interfaces take and return *immutable data*, such as *immutable Java records*
+  * to help enforce immutability of these Java records, *Guava immutable collections* are a good fit
+
+Making this service layer contract quite visible also helps in enforcing "proper" application layering.
+That is, service layer methods return "data objects", but these data objects themselves do not (directly
+or indirectly) call service layer methods. This way it becomes more clear where the performance costs are,
+where transactional boundaries are, etc.
 
 ## Using jOOQ where JPA/Hibernate offers less value
 
