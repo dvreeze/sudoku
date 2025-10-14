@@ -66,6 +66,11 @@ effectively. For example, the advice about using lazy fetching can be found
 [Use Lazy Fetching](https://thorben-janssen.com/hibernate-performance-tuning/#avoid-unnecessary-queries--choose-the-right-fetchtype)
 and [Use Query-specific Fetching](https://thorben-janssen.com/hibernate-performance-tuning/#avoid-unnecessary-queries--use-queryspecific-fetching).
 
+Note that *consistently using lazy fetching for entity associations* vastly increases *maintainability* of the
+code base, because "association fetching concerns" are *localized* to pieces of code dealing with one specific
+JPQL/Criteria query. This is also the reason I do not believe in "generic DAO code" offering generic
+JPA method calls.
+
 So far I haven't really seen that advice being followed in practice. Hence, my prior misconception that Hibernate is
 intrinsically very hard to use well.
 
