@@ -121,7 +121,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <systemPropertyVariables>
-                        <useJooq>${useJooq}</useJooq>
+                        <underlyingSessionType>${underlyingSessionType}</underlyingSessionType>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

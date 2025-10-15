@@ -25,7 +25,7 @@ import eu.cdevreeze.sudoku.service.SudokuService;
 import org.jooq.DSLContext;
 import org.jooq.Records;
 import org.jspecify.annotations.Nullable;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +43,7 @@ import static org.jooq.impl.DSL.*;
  * @author Chris de Vreeze
  */
 @Service
-@ConditionalOnBooleanProperty(name = "useJooq")
+@ConditionalOnProperty(name = "underlyingSessionType", havingValue = "org.jooq.DSLContext")
 public class JooqSudokuService implements SudokuService {
 
     private record CellTableRow(

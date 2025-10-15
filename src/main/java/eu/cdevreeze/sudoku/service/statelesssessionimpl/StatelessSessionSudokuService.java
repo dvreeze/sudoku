@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package eu.cdevreeze.sudoku.service.jpaimpl;
+package eu.cdevreeze.sudoku.service.statelesssessionimpl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -23,208 +23,227 @@ import eu.cdevreeze.sudoku.entity.*;
 import eu.cdevreeze.sudoku.model.*;
 import eu.cdevreeze.sudoku.service.SudokuService;
 import jakarta.persistence.EntityGraph;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Subgraph;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
-import org.hibernate.internal.SessionImpl;
+import org.hibernate.SessionFactory;
+import org.hibernate.StatelessSession;
+import org.hibernate.internal.StatelessSessionImpl;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import javax.sql.DataSource;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
- * Implementation of {@link SudokuService} using Jakarta Persistence.
+ * Implementation of {@link SudokuService} using Hibernate's {@link StatelessSession}.
+ * <p>
+ * Note how similar this implementation is to the JPA implementation of the service.
  *
  * @author Chris de Vreeze
  */
 @Service
-@ConditionalOnProperty(name = "underlyingSessionType", havingValue = "jakarta.persistence.EntityManager", matchIfMissing = true)
-public class JpaSudokuService implements SudokuService {
+@ConditionalOnProperty(name = "underlyingSessionType", havingValue = "org.hibernate.StatelessSession")
+public class StatelessSessionSudokuService implements SudokuService {
 
     // See https://thorben-janssen.com/hibernate-tips-how-to-bootstrap-hibernate-with-spring-boot/
+    // Yet this time using a StatelessSession rather than an EntityManager
 
     private static final String LOAD_GRAPH_KEY = "jakarta.persistence.loadgraph";
 
-    // Shared thread-safe proxy for the actual transactional EntityManager that differs for each transaction
-    @PersistenceContext
-    private final EntityManager entityManager;
+    private final DataSource dataSource;
+    private final SessionFactory sessionFactory;
 
-    public JpaSudokuService(EntityManager entityManager) {
-        this.entityManager = entityManager;
+    public StatelessSessionSudokuService(
+            DataSource dataSource,
+            SessionFactory sessionFactory) {
+        this.dataSource = dataSource;
+        this.sessionFactory = sessionFactory;
     }
+
+    // Below the assumption is made that it is ok to open a new StatelessSession and close it within the methods
+    // marked as being transactional.
 
     @Override
     @Transactional
     public Sudoku createSudoku(Grid startGrid) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        try (StatelessSession statelessSession = openStatelessSession()) {
+            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
 
-        Preconditions.checkArgument(startGrid.idOption().isEmpty());
-        Preconditions.checkArgument(startGrid.cells().stream().allMatch(c -> c.idOption().isEmpty()));
+            Preconditions.checkArgument(startGrid.idOption().isEmpty());
+            Preconditions.checkArgument(startGrid.cells().stream().allMatch(c -> c.idOption().isEmpty()));
 
-        // Create new JPA entities, and persist them
+            // Create new JPA entities, and persist them
 
-        GridEntity gridEntity = new GridEntity();
+            GridEntity gridEntity = new GridEntity();
 
-        entityManager.persist(gridEntity);
+            statelessSession.insert(gridEntity);
 
-        entityManager.flush();
-        entityManager.refresh(gridEntity);
+            statelessSession.refresh(gridEntity);
 
-        startGrid.cells().forEach(cell -> {
-            CellEntity cellEntity = new CellEntity();
-            cellEntity.setGrid(gridEntity);
-            cellEntity.setRowNumber(cell.rowNumber());
-            cellEntity.setColumnNumber(cell.columnNumber());
-            cellEntity.setCellValue(cell.valueOption().stream().boxed().findFirst().orElse(null));
+            startGrid.cells().forEach(cell -> {
+                CellEntity cellEntity = new CellEntity();
+                cellEntity.setGrid(gridEntity);
+                cellEntity.setRowNumber(cell.rowNumber());
+                cellEntity.setColumnNumber(cell.columnNumber());
+                cellEntity.setCellValue(cell.valueOption().stream().boxed().findFirst().orElse(null));
 
-            entityManager.persist(cellEntity);
-        });
+                statelessSession.insert(cellEntity);
+            });
 
-        entityManager.flush();
+            EntityGraph<GridEntity> gridGraph = statelessSession.createEntityGraph(GridEntity.class);
+            gridGraph.addAttributeNode(GridEntity_.cells);
+            GridEntity gridEntity2 = statelessSession.get(gridGraph, gridEntity.getId());
 
-        EntityGraph<GridEntity> gridGraph = entityManager.createEntityGraph(GridEntity.class);
-        gridGraph.addAttributeNode(GridEntity_.cells);
-        Map<String, Object> props = Map.of(LOAD_GRAPH_KEY, gridGraph);
-        GridEntity gridEntity2 = entityManager.find(GridEntity.class, gridEntity.getId(), props);
+            SudokuEntity sudokuEntity = new SudokuEntity();
+            sudokuEntity.setStartGrid(gridEntity2);
 
-        SudokuEntity sudokuEntity = new SudokuEntity();
-        sudokuEntity.setStartGrid(gridEntity2);
+            statelessSession.insert(sudokuEntity);
 
-        entityManager.persist(sudokuEntity);
+            // Refresh, to prepare querying again
+            statelessSession.refresh(sudokuEntity);
+            Objects.requireNonNull(sudokuEntity.getId());
 
-        // Flush and refresh, to prepare querying again
-        entityManager.flush();
-        entityManager.refresh(sudokuEntity);
-        Objects.requireNonNull(sudokuEntity.getId());
+            // Query for the inserted JPA entity with all associations, and return it
+            Sudoku sudoku = findSudoku(sudokuEntity.getId()).orElseThrow();
 
-        // Query for the persisted JPA entity with all associations, and return it
-        Sudoku sudoku = findSudoku(sudokuEntity.getId()).orElseThrow();
-
-        Preconditions.checkArgument(sudoku.idOption().isPresent());
-        Preconditions.checkArgument(sudoku.startGrid().idOption().isPresent());
-        return sudoku;
+            Preconditions.checkArgument(sudoku.idOption().isPresent());
+            Preconditions.checkArgument(sudoku.startGrid().idOption().isPresent());
+            return sudoku;
+        }
     }
 
     @Override
     @Transactional
     public GameHistory startGame(long sudokuId, String player, Instant startTime) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        try (StatelessSession statelessSession = openStatelessSession()) {
+            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
 
-        // Query for associated data
-        SudokuEntity sudokuEntity = findSudokuEntity(sudokuId).orElseThrow();
+            // Query for associated data
+            SudokuEntity sudokuEntity = findSudokuEntity(sudokuId, statelessSession).orElseThrow();
 
-        // Create new JPA entity, filling in retrieved associated data (leaving steps field empty)
-        GameHistoryEntity gameHistoryEntity = new GameHistoryEntity();
-        gameHistoryEntity.setPlayer(player);
-        gameHistoryEntity.setStartTime(startTime.atOffset(ZoneOffset.UTC));
-        gameHistoryEntity.setSudoku(sudokuEntity);
-        gameHistoryEntity.setSteps(new ArrayList<>());
+            // Create new JPA entity, filling in retrieved associated data (leaving steps field empty)
+            GameHistoryEntity gameHistoryEntity = new GameHistoryEntity();
+            gameHistoryEntity.setPlayer(player);
+            gameHistoryEntity.setStartTime(startTime.atOffset(ZoneOffset.UTC));
+            gameHistoryEntity.setSudoku(sudokuEntity);
+            gameHistoryEntity.setSteps(new ArrayList<>());
 
-        // Persist that new JPA entity (no cascading)
-        entityManager.persist(gameHistoryEntity);
+            // Insert that new JPA entity (no cascading possible with StatelessSession)
+            statelessSession.insert(gameHistoryEntity);
 
-        // Flush and refresh, to prepare querying again
-        entityManager.flush();
-        entityManager.refresh(gameHistoryEntity); // Returns ID, and more than that
-        Objects.requireNonNull(gameHistoryEntity.getId());
+            // Refresh, to prepare querying again
+            statelessSession.refresh(gameHistoryEntity); // Returns ID, and more than that
+            Objects.requireNonNull(gameHistoryEntity.getId());
 
-        // Query for the persisted JPA entity with all associations, and return it
-        GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
+            // Query for the inserted JPA entity with all associations, and return it
+            GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
 
-        Preconditions.checkArgument(gameHistory.idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.isStillValid());
-        return gameHistory;
+            Preconditions.checkArgument(gameHistory.idOption().isPresent());
+            Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
+            Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
+            Preconditions.checkArgument(gameHistory.isStillValid());
+            return gameHistory;
+        }
     }
 
     @Override
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value, Instant stepTime) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        try (StatelessSession statelessSession = openStatelessSession()) {
+            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
 
-        // Query for the JPA entity before updating it
-        GameHistoryEntity gameHistoryEntity = findGameHistoryEntity(gameHistoryId).orElseThrow();
+            // Query for the JPA entity before updating it
+            GameHistoryEntity gameHistoryEntity =
+                    findGameHistoryEntity(gameHistoryId, statelessSession).orElseThrow();
 
-        Preconditions.checkArgument(gameHistoryId == Objects.requireNonNull(gameHistoryEntity.getId()));
-        GameHistory tempGameHistory = convertToGameHistoryWithoutIds(gameHistoryEntity);
-        Preconditions.checkArgument(tempGameHistory.currentGrid().isStillValid());
-        Preconditions.checkArgument(
-                tempGameHistory
-                        .currentGrid()
-                        .fillCellIfEmpty(pos, value)
-                        .stream()
-                        .anyMatch(Grid::isStillValid)
-        );
+            Preconditions.checkArgument(gameHistoryId == Objects.requireNonNull(gameHistoryEntity.getId()));
+            GameHistory tempGameHistory = convertToGameHistoryWithoutIds(gameHistoryEntity);
+            Preconditions.checkArgument(tempGameHistory.currentGrid().isStillValid());
+            Preconditions.checkArgument(
+                    tempGameHistory
+                            .currentGrid()
+                            .fillCellIfEmpty(pos, value)
+                            .stream()
+                            .anyMatch(Grid::isStillValid)
+            );
 
-        // Create new JPA entity, filling in retrieved associated data
-        StepEntity stepEntity = new StepEntity();
-        stepEntity.setGameHistory(gameHistoryEntity);
-        stepEntity.setStepDateTime(stepTime.atOffset(ZoneOffset.UTC));
-        stepEntity.setRowNumber(pos.rowNumber());
-        stepEntity.setColumnNumber(pos.columnNumber());
-        stepEntity.setStepValue(value);
+            // Create new JPA entity, filling in retrieved associated data
+            StepEntity stepEntity = new StepEntity();
+            stepEntity.setGameHistory(gameHistoryEntity);
+            stepEntity.setStepDateTime(stepTime.atOffset(ZoneOffset.UTC));
+            stepEntity.setRowNumber(pos.rowNumber());
+            stepEntity.setColumnNumber(pos.columnNumber());
+            stepEntity.setStepValue(value);
 
-        // Persist that new JPA entity (no cascading)
-        entityManager.persist(stepEntity);
+            // Insert that new JPA entity (no cascading)
+            statelessSession.insert(stepEntity);
 
-        // Flush and refresh, to prepare querying again
-        entityManager.flush();
-        entityManager.refresh(gameHistoryEntity);
-        Objects.requireNonNull(gameHistoryEntity.getId());
+            // Refresh, to prepare querying again
+            statelessSession.refresh(gameHistoryEntity);
+            Objects.requireNonNull(gameHistoryEntity.getId());
 
-        // Query for the persisted JPA entity with all associations, and return it
-        GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
+            // Query for the inserted JPA entity with all associations, and return it
+            GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
 
-        Preconditions.checkArgument(gameHistory.idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.isStillValid());
-        return gameHistory;
+            Preconditions.checkArgument(gameHistory.idOption().isPresent());
+            Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
+            Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
+            Preconditions.checkArgument(gameHistory.isStillValid());
+            return gameHistory;
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<Grid> findGrid(long gridId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        try (StatelessSession statelessSession = openStatelessSession()) {
+            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
 
-        return findGridEntity(gridId).map(this::convertToGrid);
+            return findGridEntity(gridId, statelessSession).map(this::convertToGrid);
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<Sudoku> findSudoku(long sudokuId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        try (StatelessSession statelessSession = openStatelessSession()) {
+            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
 
-        return findSudokuEntity(sudokuId).map(this::convertToSudoku);
+            return findSudokuEntity(sudokuId, statelessSession).map(this::convertToSudoku);
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<GameHistory> findGameHistory(long gameHistoryId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        try (StatelessSession statelessSession = openStatelessSession()) {
+            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
 
-        return findGameHistoryEntity(gameHistoryId).map(this::convertToGameHistory);
+            return findGameHistoryEntity(gameHistoryId, statelessSession).map(this::convertToGameHistory);
+        }
     }
 
     // Private query methods
 
-    private Optional<GridEntity> findGridEntity(long gridId) {
+    private Optional<GridEntity> findGridEntity(long gridId, StatelessSession statelessSession) {
         // First build up the query (without worrying about the load/fetch graph)
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaBuilder cb = statelessSession.getCriteriaBuilder();
         CriteriaQuery<GridEntity> cq = cb.createQuery(GridEntity.class);
 
         Root<GridEntity> gridRoot = cq.from(GridEntity.class);
@@ -233,23 +252,23 @@ public class JpaSudokuService implements SudokuService {
 
         // Next build up the entity graph, to specify which associated data should be fetched
         // At the same time, this helps achieve good performance, by solving the N + 1 problem
-        EntityGraph<GridEntity> gridGraph = entityManager.createEntityGraph(GridEntity.class);
+        EntityGraph<GridEntity> gridGraph = statelessSession.createEntityGraph(GridEntity.class);
         gridGraph.addAttributeNode(GridEntity_.cells);
 
         // Run the query, providing the load graph as query hint
         // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
-        return entityManager.createQuery(cq)
+        return statelessSession.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, gridGraph)
                 .getResultList()
                 .stream()
                 .findFirst();
     }
 
-    private Optional<SudokuEntity> findSudokuEntity(long sudokuId) {
+    private Optional<SudokuEntity> findSudokuEntity(long sudokuId, StatelessSession statelessSession) {
         // First build up the query (without worrying about the load/fetch graph)
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaBuilder cb = statelessSession.getCriteriaBuilder();
         CriteriaQuery<SudokuEntity> cq = cb.createQuery(SudokuEntity.class);
 
         Root<SudokuEntity> sudokuRoot = cq.from(SudokuEntity.class);
@@ -258,7 +277,7 @@ public class JpaSudokuService implements SudokuService {
 
         // Next build up the entity graph, to specify which associated data should be fetched
         // At the same time, this helps achieve good performance, by solving the N + 1 problem
-        EntityGraph<SudokuEntity> sudokuGraph = entityManager.createEntityGraph(SudokuEntity.class);
+        EntityGraph<SudokuEntity> sudokuGraph = statelessSession.createEntityGraph(SudokuEntity.class);
         sudokuGraph.addAttributeNode(SudokuEntity_.startGrid);
         Subgraph<GridEntity> gridSubgraph = sudokuGraph.addSubgraph(SudokuEntity_.startGrid);
         gridSubgraph.addAttributeNode(GridEntity_.cells);
@@ -267,21 +286,22 @@ public class JpaSudokuService implements SudokuService {
         // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
-        return entityManager.createQuery(cq)
+        return statelessSession.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, sudokuGraph)
                 .getResultList()
                 .stream()
                 .findFirst();
     }
 
-    private Optional<GameHistoryEntity> findGameHistoryEntity(long gameHistoryId) {
+    private Optional<GameHistoryEntity> findGameHistoryEntity(long gameHistoryId, StatelessSession statelessSession) {
         // Avoiding a cartesian product ("MultiBagFetchException") by using 2 criteria queries
 
-        Optional<GameHistoryEntity> partialGameHistoryOption = findGameHistoryEntityWithoutGridCells(gameHistoryId);
+        Optional<GameHistoryEntity> partialGameHistoryOption =
+                findGameHistoryEntityWithoutGridCells(gameHistoryId, statelessSession);
 
         // Seems to retrieve the Sudoku twice, once implicitly and once explicitly
         Optional<SudokuEntity> sudokuOption = partialGameHistoryOption.flatMap(gameHist ->
-                findSudokuEntity(Objects.requireNonNull(gameHist.getSudoku().getId()))
+                findSudokuEntity(Objects.requireNonNull(gameHist.getSudoku().getId()), statelessSession)
         );
 
         return partialGameHistoryOption
@@ -292,9 +312,9 @@ public class JpaSudokuService implements SudokuService {
                         }));
     }
 
-    private Optional<GameHistoryEntity> findGameHistoryEntityWithoutGridCells(long gameHistoryId) {
+    private Optional<GameHistoryEntity> findGameHistoryEntityWithoutGridCells(long gameHistoryId, StatelessSession statelessSession) {
         // First build up the query (without worrying about the load/fetch graph)
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaBuilder cb = statelessSession.getCriteriaBuilder();
         CriteriaQuery<GameHistoryEntity> cq = cb.createQuery(GameHistoryEntity.class);
 
         Root<GameHistoryEntity> gameHistoryRoot = cq.from(GameHistoryEntity.class);
@@ -303,7 +323,7 @@ public class JpaSudokuService implements SudokuService {
 
         // Next build up the entity graph, to specify which associated data should be fetched
         // At the same time, this helps achieve good performance, by solving the N + 1 problem
-        EntityGraph<GameHistoryEntity> gameHistoryGraph = entityManager.createEntityGraph(GameHistoryEntity.class);
+        EntityGraph<GameHistoryEntity> gameHistoryGraph = statelessSession.createEntityGraph(GameHistoryEntity.class);
         gameHistoryGraph.addAttributeNode(GameHistoryEntity_.steps);
         gameHistoryGraph.addAttributeNode(GameHistoryEntity_.sudoku);
         Subgraph<SudokuEntity> sudokuSubgraph = gameHistoryGraph.addSubgraph(GameHistoryEntity_.sudoku);
@@ -313,7 +333,7 @@ public class JpaSudokuService implements SudokuService {
         // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
-        return entityManager.createQuery(cq)
+        return statelessSession.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, gameHistoryGraph)
                 .getResultList()
                 .stream()
@@ -412,6 +432,15 @@ public class JpaSudokuService implements SudokuService {
                                 step.getStepValue()
                         ))
                         .collect(ImmutableList.toImmutableList())
+        );
+    }
+
+    // Other private methods
+
+    private StatelessSession openStatelessSession() {
+        // This should open a StatelessSession that participates in Spring-managed transactions
+        return sessionFactory.openStatelessSession(
+                DataSourceUtils.getConnection(dataSource)
         );
     }
 }
