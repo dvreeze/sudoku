@@ -160,6 +160,7 @@ following characteristics:
 * out of the box, they offer natural *value equality* (through provided overridden `equals` and `hashCode` methods)
 * this programming style is rooted in modern *functional Java programming*, characterized by "immutability preferred, and side effects minimized/localized"
   * there is a clear influence from OO/FP languages like *Scala*, which showed that OO is not about mutability, and that OO and FP go well together
+  * limiting mutability and side effects tends to help improve code quality (again compare Java's legacy "date-time" API versus the later one)
 
 Maybe this is not a big deal in a small code base, but in a large code base this makes a big difference
 in maintainability and low bug counts.
@@ -205,6 +206,9 @@ One last note about these immutable model classes:
   * for example, a JPA entity is a *Java representation of a database table row*, no more, no less
   * and a JAXB-annotated class is a *Java representation of XML data*, etc.
   * mixing these concerns in the same data class quickly becomes a mess
+* it is also perfectly ok to offer specific "views" on non-trivial Java records as nested record classes
+  * e.g., such "views" could leave out some "associations"
+  * using explicit types makes this explicit, whereas this is implicit in JPA entities
 
 ## Using jOOQ where JPA/Hibernate offers less value
 
