@@ -135,13 +135,15 @@ regard:
 * they make use of [Hibernate proxies](https://thorben-janssen.com/hibernate-proxies/), thus hiding the real JPA entity
 * they certainly are not thread-safe, although sometimes that would be a desirable property
 * they are not technology-agnostic
+* they support bidirectional associations, which has its pros and cons
 * in practice, they often tend to "attract" the use of legacy APIs such as the mutable `java.util.Date`
 * defining *equality* (through overriding of `equals` and `hashCode`) can be a challenge for these mutable data structures
 * this programming style is rooted in old-school *imperative Java programming*, characterized by "mutability and side effects everywhere"
 
 In my opinion it is well worth the effort to keep JPA entities local to "database access code",
-and convert them to *(deeply) immutable Java records*. Again, remember the advice from *Effective Java*
-on *minimizing mutability*. Such "data classes" have the following characteristics:
+and convert them to *(deeply) immutable Java records* (as "immutable DTOs" or "immutable value objects").
+Again, remember the advice from *Effective Java* on *minimizing mutability*. Such "data classes" have the
+following characteristics:
 * they are (deeply) *immutable*, so have just one possible state, and are therefore quite easy to reason about
 * they tend to use the type-safe `java.util.Optional` rather than `null` to describe optional data fields
 * they even tend to "attract" the now de-facto standard [JSpecify annotations](https://jspecify.dev/) to help keep `null` away as much as possible
@@ -150,6 +152,9 @@ on *minimizing mutability*. Such "data classes" have the following characteristi
 * they do *not use any proxies*, so what you see is what you get, and there is no hidden state
 * they are *thread-safe* (if all of their record components are immutable as well)
 * they are technology-agnostic, just like the abstract service layer Java interfaces passing them around
+* they do not support "bidirectional associations" if they are deeply immutable
+  * that is, record object trees are purely hierarchical ("top-down") data structures, just like XML and JSON trees
+  * this is consistent with their immutable nature; one constructor call creates the (potentially deeply nested) record, which cannot be updated in-place afterward
 * in practice, they tend to "attract" modern Java APIs (that use immutable data structures), such as `java.time.Instant`
   * just compare `java.util.Date` and `java.util.Calendar` on the one hand with the *Java time API* on the other hand; it's no contest, really
 * out of the box, they offer natural *value equality* (through provided overridden `equals` and `hashCode` methods)
@@ -171,7 +176,15 @@ opinion. A gotcha may be that I did not always see this work well when calling m
 When calling `TypedQuery.getResultList`, and then converting the JPA entity result `List` into a
 collection of Java records (through a "Java Stream pipeline"), I haven't seen any data loss so far.
 
-Hence, in my opinion a *service layer* in a large Java code base using Hibernate looks like this at the
+To avoid first-level cache overhead when using JPA entities only as very short-lived data structures
+that are immediately converted to immutable Java records within the open `Session`/`EntityManager`,
+consider using Hibernate's [`StatelessSession`](https://thorben-janssen.com/hibernates-statelesssession/).
+Do consider the consequences, though (apart from using a "non-standard" API, if that's considered a problem).
+For example, Hibernate then no longer guarantees that *reading the same entity multiple times within the
+same `Session` returns the same Java object*. Code that inserts or updates entities is also more verbose,
+there is no cascading support, and the code is closer to JDBC/SQL. This could be a good thing, though.
+
+In summary, in my opinion a *service layer* in a large Java code base using Hibernate looks like this at the
 boundary:
 * *Java interfaces* for the abstract service layer API contracts
 * the abstract methods in these Java interfaces take and return *immutable data*, such as *immutable Java records*
