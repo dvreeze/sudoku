@@ -256,8 +256,7 @@ public class StatelessSessionSudokuService implements SudokuService {
         gridGraph.addAttributeNode(GridEntity_.cells);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
-        // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
+        // Note that JPA entities do not escape the stateless session (when looking at the callers of this private method)
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return statelessSession.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, gridGraph)
@@ -283,8 +282,7 @@ public class StatelessSessionSudokuService implements SudokuService {
         gridSubgraph.addAttributeNode(GridEntity_.cells);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
-        // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
+        // Note that JPA entities do not escape the stateless session (when looking at the callers of this private method)
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return statelessSession.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, sudokuGraph)
@@ -330,8 +328,7 @@ public class StatelessSessionSudokuService implements SudokuService {
         sudokuSubgraph.addAttributeNode(SudokuEntity_.startGrid);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
-        // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
+        // Note that JPA entities do not escape the stateless session (when looking at the callers of this private method)
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return statelessSession.createQuery(cq)
                 .setHint(LOAD_GRAPH_KEY, gameHistoryGraph)

@@ -93,6 +93,7 @@ public class JpaSudokuService implements SudokuService {
         EntityGraph<GridEntity> gridGraph = entityManager.createEntityGraph(GridEntity.class);
         gridGraph.addAttributeNode(GridEntity_.cells);
         Map<String, Object> props = Map.of(LOAD_GRAPH_KEY, gridGraph);
+        // While in the same open EntityManager, this is the same Java object as gridEntity
         GridEntity gridEntity2 = entityManager.find(GridEntity.class, gridEntity.getId(), props);
 
         SudokuEntity sudokuEntity = new SudokuEntity();
@@ -237,7 +238,7 @@ public class JpaSudokuService implements SudokuService {
         gridGraph.addAttributeNode(GridEntity_.cells);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
+        // Note that JPA entities do not escape the persistence context (when looking at the callers of this private method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return entityManager.createQuery(cq)
@@ -264,7 +265,7 @@ public class JpaSudokuService implements SudokuService {
         gridSubgraph.addAttributeNode(GridEntity_.cells);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
+        // Note that JPA entities do not escape the persistence context (when looking at the callers of this private method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return entityManager.createQuery(cq)
@@ -310,7 +311,7 @@ public class JpaSudokuService implements SudokuService {
         sudokuSubgraph.addAttributeNode(SudokuEntity_.startGrid);
 
         // Run the query, providing the load graph as query hint
-        // Note that JPA entities do not escape the persistence context (when looking at the callers of this method)
+        // Note that JPA entities do not escape the persistence context (when looking at the callers of this private method)
         // It is not efficient to first retrieve entities and then convert them to DTOs, but it is practical
         // Note that method getResultStream was avoided; thus I appear to avoid some data loss in the query
         return entityManager.createQuery(cq)
