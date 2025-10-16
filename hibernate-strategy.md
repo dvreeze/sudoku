@@ -140,7 +140,11 @@ far fewer bugs. This advice also applies to "data classes". Let's see how *JPA e
 regard:
 * they are highly mutable, so harder to reason about (w.r.t. their "state space")
 * they typically allow for `null` to be used for all fields
-* they depend on *hidden state*, such as the presence or absence of a `Session`, cascading behavior, etc.
+* they depend on *hidden state*, such as:
+  * the presence or absence of a `Session` ("persistence context")
+  * the *lifecycle state* of the entity (if there is a "persistence context")
+  * the extent to which *associations* have been loaded
+  * cascading behavior, etc.
 * they can lead to the dreaded [`LazyInitializationException`](https://thorben-janssen.com/lazyinitializationexception/)
 * they make use of [Hibernate proxies](https://thorben-janssen.com/hibernate-proxies/), thus hiding the real JPA entity
 * they certainly are not thread-safe, although sometimes that would be a desirable property
