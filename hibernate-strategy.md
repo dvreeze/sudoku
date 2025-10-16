@@ -263,8 +263,8 @@ Type-safe SQL querying/updates is also supported by jOOQ, and by all means, we s
 The type-safe SQL DSL in jOOQ reads like SQL, but is type-checked by the Java compiler. In that sense
 it is similar to type-safe Criteria queries in JPA, using the metamodel instead of strings for attribute
 names etc. Yet jOOQ's queries are SQL queries, not "entity queries". The completeness of jOOQ's support
-for SQL is quite impressive, so this is a big plus of jOOQ where JPA/Hibernate does not support SQL features
-we want to use.
+for SQL is quite impressive, so this is a big plus of jOOQ in those cases where JPA/Hibernate does not
+support SQL features we want to use.
 
 In a Spring Boot application, support for jOOQ is on par with its support for JPA. Transaction management
 is left to Spring, and instead of an injected `EntityManager` we would use an injected jOOQ
