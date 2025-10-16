@@ -30,8 +30,8 @@ A successful strategy for using Hibernate could therefore be as follows:
   * See for example the book *Effective Java, 3rd Edition*, by Joshua Bloch, on *minimizing mutability*
 
 The underlying paradigms involved are quite different:
-* Within an open `EntityManager`: JPA entities as old-school mutable JavaBeans, using `null` everywhere
-* Outside the `EntityManager`: immutable Java records, avoiding `null`, using (type-safe) `Optional` instead
+* Within an open `EntityManager`: JPA entities as old-school mutable JavaBeans, using `null` everywhere, and with lots of hidden state
+* Outside the `EntityManager`: immutable Java records, avoiding `null` but using (type-safe) `Optional` instead, and without any hidden state
 
 Sometimes Hibernate is not a good fit, and directly working with SQL in a type-safe manner is preferable.
 This is where [jOOQ](https://www.jooq.org/) shines. Combining jOOQ and Hibernate in the same code base
