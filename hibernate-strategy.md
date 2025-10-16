@@ -226,3 +226,55 @@ One last note about these immutable model classes:
 
 ## Using jOOQ where JPA/Hibernate offers less value
 
+Sometimes we don't want the runtime overhead of creating many managed JPA entities in the "persistence
+context" during JPQL/Criteria query execution. Admittedly, using a Hibernate `StatelessSession` we can
+avoid these runtime costs, if we are fine with losing features like lazy loading, dirty checking and
+cascading. Yet occasionally we might want to use more advanced SQL features (possibly database-specific)
+than supported by Hibernate. In such cases, in a Spring context, we used to work with plain SQL and the
+Spring `JdbcTemplate`. This approach does have some limitations, such as:
+* manually composing SQL strings, without good support for reuse of query parts (in particular where only the "where" clause differs)
+* boilerplate code to turn sets of result set rows into nested object graphs
+* lacking light-weight abstractions over differences between database-specific SQL dialects
+
+This is where [jOOQ](https://www.jooq.org/) comes in as an excellent companion/alternative to Hibernate.
+
+Do keep in mind, though, that for commercial database products there are license costs involved when using jOOQ.
+This should not be a problem for larger organisations, and it helps the jOOQ team improve and expand
+their product line, but it's important to be aware of this. So, for PostgreSQL and MySQL jOOQ is free of
+charge, whereas for Oracle and Db2 it is not.
+
+That said, gone are the days that SQL `select` statements only return flat data rows, where result set
+conversion to nested Java object graphs requires a lot of boilerplate code. First of all, *SQL/JSON*
+is now ubiquitous, so returning result sets with *nested collections* is already possible, and this
+makes direct conversions from result set rows to Java object graphs possible. Yet jOOQ goes further
+than that, and makes *nested collection processing* practical through its support for
+[multisets](https://blog.jooq.org/jooq-3-15s-new-multiset-operator-will-change-how-you-think-about-sql/)
+and [row expressions](https://www.jooq.org/doc/latest/manual/sql-building/column-expressions/row-value-expressions/).
+For database products that natively offer multiset and row value expressions, jOOQ leverages that support.
+Otherwise, jOOQ bases its support for these SQL expressions on the database's SQL/JSON support.
+
+Also see [No more `MultipleBagFetchException`](https://blog.jooq.org/no-more-multiplebagfetchexception-thanks-to-multiset-nested-collections/)
+for an advantage of jOOQ over Hibernate when it comes to processing multiple nested collections in the
+same query.
+
+Like JPA/Hibernate with its support for type-safe metamodel and Criteria queries, jOOQ can generate a
+type-safe Java representation of the database's data model. The latter directly represents the DDL SQL.
+Type-safe SQL querying/updates is also supported by jOOQ, and by all means, we should use it.
+The type-safe SQL DSL in jOOQ reads like SQL, but is type-checked by the Java compiler. In that sense
+it is similar to type-safe Criteria queries in JPA, using the metamodel instead of strings for attribute
+names etc. Yet jOOQ's queries are SQL queries, not "entity queries". The completeness of jOOQ's support
+for SQL is quite impressive, so this is a big plus of jOOQ where JPA/Hibernate does not support SQL features
+we want to use.
+
+In a Spring Boot application, support for jOOQ is on par with its support for JPA. Transaction management
+is left to Spring, and instead of an injected `EntityManager` we would use an injected jOOQ
+`DSLContext`.
+
+My (somewhat limited) experiences with jOOQ used in this way are quite positive. Note that type-safety
+is lost if a "tuple" has more than 22 columns, but on the other hand, we can always introduce row value
+expressions to mitigate this limitation. Reuse of type-safe SQL "query parts" is also supported, if we
+do that in the recommended way (depending only on jOOQ types such as `org.jooq.Table` and `org.jooq.Condition`).
+
+In principle there is no reason why using `EntityManager`, `StatelessSession` and `DSLContext` in the
+same code base would be a problem. Note that this goes well together with technology-agnostic service
+API contracts, with methods that take and return immutable data values.
