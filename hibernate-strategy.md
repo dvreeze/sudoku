@@ -212,6 +212,9 @@ except for some "changes". Admittedly, typically more code would be needed than 
 JPA entities as data carriers, but the code is simple and clear, and *locally reasoning about code* is
 restored.
 
+This is especially true if (even `private`) methods have *immutable parameters and return values* (without
+using `void` as return type), *no more hidden state than needed*, and *no more side effects than needed*.
+
 Yet where do we convert JPA entities to immutable Java records? One possibility is to do that within the
 open `EntityManager`. We could turn "result sets" directly into Java records, or we could convert
 JPA entities into Java records while still in an open `EntityManager`. The latter comes with some overhead
