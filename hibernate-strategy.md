@@ -184,8 +184,9 @@ deep call chains of transactional services calling transactional services (typic
 context of the same transaction, if the transaction propagation is "REQUIRED"). So the transactional
 Hibernate `Session`/`EntityManager` is kept open across many service method calls in the call stack.
 
-Now suppose that deep in such a call stack data is *read from a (non-trivial) JPA entity*. What don't we
-know about that JPA entity at that point in the code, if we don't look at the calling context? For example:
+Now suppose that deep in such a call stack data is *read from a (non-trivial) JPA entity*. What do or don't we
+know about that JPA entity at that point in the code, if we don't consider the calling context? Some questions
+that arise are the following ones:
 * are we inside a transactional Hibernate `Session`/`EntityManager`, so is there an open *persistence context*?
 * if so, what is the "lifecycle status" of the entity? is it *managed*, *transient*, *detached* or *removed*?
 * if the (managed) entity has been retrieved at the beginning of the `Session`, what updates have since been made to the entity?
@@ -204,18 +205,18 @@ possible that higher up in the call chain, just before the `Session` is closed a
 committed, the updates to the managed JPA entity/entities are flushed to the database. In other words,
 we *cannot locally reason about database updates*.
 
-Contrast this with the use of *immutable Java records* as "data carriers", and explicit (JPA) database query
-and update calls. All the above issues disappear. There is *no hidden state*. There are *no hidden database
+Contrast this with the use of *immutable Java records* as "data carriers", and *explicit* database query
+and update calls. All the issues above disappear. There is *no hidden state*. There are *no hidden database
 updates*. As a bonus, we get thread-safety as well, which is needed in case the Java records are used in
 multiple threads. Updates become "functional updates", with Java records that are copies of the original
 except for some "changes". Admittedly, typically more code would be needed than when working exclusively with
 JPA entities as data carriers, but the code is simple and clear, and *locally reasoning about code* is
-restored.
+largely restored.
 
-This is especially true if (even `private`) methods have *immutable parameters and return values* (without
-using `void` as return type), using *no more hidden (program) state than needed*, and having *no more
-side effects than needed*. In other words, functions that are closer to pure functions in functional
-programming, thus enabling *local reasoning* about code.
+This is especially true if (even many `private`) methods have *immutable parameters and return values* (without
+using `void` as return type), using *as little hidden (program) state as required*, and having *as few
+side effects as required*. In other words, functions that are *closer to pure functions* in *functional
+programming*, thus enabling *local reasoning* about code.
 
 Yet where do we convert JPA entities to immutable Java records? One possibility is to do that within the
 open `EntityManager`. We could turn "result sets" directly into Java records, or we could convert
