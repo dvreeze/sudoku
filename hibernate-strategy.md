@@ -317,3 +317,73 @@ do that in the recommended way (depending only on jOOQ types such as `org.jooq.T
 In principle there is no reason why using `EntityManager`, `StatelessSession` and `DSLContext` in the
 same code base would be a problem. Note that this goes well together with technology-agnostic service
 API contracts, with methods that take and return immutable data values.
+
+## Addendum: learning from best practices regarding the use of the Java `Stream` API
+
+Above the case was made for limiting/encapsulating mutability and side effects when using Hibernate.
+Another motivation for this can be found in best practices around the use of the `java.util.stream.Stream`
+API, where similar advice is given for functions at a finer granularity.
+
+Consider the
+[`java.util.stream` package summary](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html).
+
+This package summary speaks of *behavioral parameters* of *Stream operations*. These are the "functions"
+passed as parameters to "higher-order functions" such as `Stream.map` and `Stream.filter`. These parameters
+are instances of *functional interfaces*, such as `java.util.function.Function` (typically passed as
+lambda expressions or method references).
+
+The package summary makes the case for these behavioral parameters to be as close to *pure functions*
+as possible. That is:
+* they must be *non-interfering*
+* they should typically be *stateless*
+* they should typically have *no side effects*
+* not mentioned there, but still important: they should typically be *total functions*
+
+A contrived example of (highly undesirable) *interference* with the data source could be like this:
+
+```java
+int n = 30_000_000;
+
+// The data source (a mutable non-thread-safe List), so it can be interfered with
+List<Integer> source = new ArrayList<>(IntStream.range(0, n).boxed().toList());
+
+// Interference with the data source (see below, where this Runnable is used)
+Runnable interference = () -> IntStream.range(0, n).forEach(i -> source.set(i, -source.get(i)));
+
+Runnable runnable = () -> {
+    // Using the data source, which is being interfered with, in a Stream pipeline
+    List<Integer> triples = IntStream.range(0, n).mapToObj(i -> source.get(i)).map(n -> 3 * n).toList();
+
+    boolean isOk = triples.equals(IntStream.range(0, n).mapToObj(n -> 3 * n).toList());
+    System.out.printf("Is OK: %b%n", isOk); // Expecting false, due to the interference
+    // The elements that probably were not interfered with
+    System.out.printf("Number of non-negative numbers: %d%n", triples.stream().filter(n -> n >= 0).count());
+    // The elements that were interfered with
+    System.out.printf("Number of negative numbers: %d%n", triples.stream().filter(n -> n < 0).count());
+};
+
+CompletableFuture<Void> future = CompletableFuture.allOf(
+    CompletableFuture.runAsync(interference, CompletableFuture.delayedExecutor(10, TimeUnit.MILLISECONDS)),
+    CompletableFuture.runAsync(runnable)
+);
+
+future.get();
+```
+
+Even though in this case the behavioral function `n -> 3 * n` did not interfere with the data source
+itself, interference with the data source during execution of the stream pipeline was not prevented.
+
+Had we used a Guava `ImmutableList` as data source, non-interference with the data source would have
+been ensured right from the start. That would be non-interference taken to the max. Typically, that is
+not needed, if the data source does not escape the current thread, but this contrast helps understand
+the concept of non-interference in the context of `Stream` pipelines.
+
+If we don't limit ourselves to (non-)interference in the context of `Stream` pipelines, we have already
+seen an example of *extreme interference*, namely updating managed JPA entities deep in a call chain
+of methods that share the same transactional `Session`, causing a database update later on, at the end
+of the `Session`. Just as non-interference is desirable for behavioral parameters of Stream operations,
+it is something to strive for in a more general sense as well.
+
+... stateless ...
+... no side effects ...
+... total functions (such as `IntStream.max`) ...
