@@ -179,6 +179,39 @@ following characteristics:
 Maybe this is not a big deal in a small code base, but in a large code base this makes a big difference
 in maintainability and low bug counts.
 
+Let's put this another way. Suppose we are maintaining a large and complex code base, in which there are
+deep call chains of transactional services calling transactional services (typically all working in the
+context of the same transaction, if the transaction propagation is "REQUIRED"). So the transactional
+Hibernate `Session`/`EntityManager` is kept open across many service method calls in the call stack.
+
+Now suppose that deep in such a call stack data is *read from a (non-trivial) JPA entity*. What don't we
+know about that JPA entity at that point in the code, if we don't look at the calling context? For example:
+* are we inside a transactional Hibernate `Session`/`EntityManager`, so is there an open *persistence context*?
+* if so, what is the "lifecycle status" of the entity? is it *managed*, *transient*, *detached* or *removed*?
+* if the (managed) entity has been retrieved at the beginning of the `Session`, what updates have since been made to the entity?
+* are specific fields of non-primitive types `null` or are they filled?
+* to what extent have *associations* been loaded (and do we currently have a persistence context, or do we potentially invite a `LazyInitialisationException`)?
+* related, which (association) fields are *proxy objects*?
+
+These are questions we can only answer when looking at the context of the code (higher up in the call chain).
+That is, we *cannot locally reason about the JPA entities*, so we make it easier to introduce bugs. Also,
+the Java compiler cannot help us here, which is a pity because Java's compile-time type-safety is a core
+strength of Java, making up for Java's verbosity.
+
+Next suppose that deep in that call stack data is *updated in the JPA entity* (possibly via "chains" of
+associations as the left-hand side of the assignment). Due to Hibernate's *dirty checking*, it is quite
+possible that higher up in the call chain, just before the `Session` is closed and the transaction is
+committed, the updates to the managed JPA entity/entities are flushed to the database. In other words,
+we *cannot locally reason about database updates*.
+
+Contrast this with the use of *immutable Java records* as "data carriers", and explicit (JPA) database query
+and update calls. All the above issues disappear. There is *no hidden state*. There are *no hidden database
+updates*. As a bonus, we get thread-safety as well, which is needed in case the Java records are used in
+multiple threads. Updates become "functional updates", with Java records that are copies of the original
+except for some "changes". Admittedly, typically more code would be needed than when working exclusively with
+JPA entities as data carriers, but the code is simple and clear, and *locally reasoning about code* is
+restored.
+
 Yet where do we convert JPA entities to immutable Java records? One possibility is to do that within the
 open `EntityManager`. We could turn "result sets" directly into Java records, or we could convert
 JPA entities into Java records while still in an open `EntityManager`. The latter comes with some overhead
