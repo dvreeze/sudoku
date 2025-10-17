@@ -213,7 +213,9 @@ JPA entities as data carriers, but the code is simple and clear, and *locally re
 restored.
 
 This is especially true if (even `private`) methods have *immutable parameters and return values* (without
-using `void` as return type), *no more hidden state than needed*, and *no more side effects than needed*.
+using `void` as return type), using *no more hidden (program) state than needed*, and having *no more
+side effects than needed*. In other words, functions that are closer to pure functions in functional
+programming, thus enabling *local reasoning* about code.
 
 Yet where do we convert JPA entities to immutable Java records? One possibility is to do that within the
 open `EntityManager`. We could turn "result sets" directly into Java records, or we could convert
