@@ -332,14 +332,18 @@ passed as parameters to "higher-order functions" such as `Stream.map` and `Strea
 are instances of *functional interfaces*, such as `java.util.function.Function` (typically passed as
 lambda expressions or method references).
 
-The package summary makes the case for these behavioral parameters to be as close to *pure functions*
-as possible. That is:
+The package summary makes the case for these behavioral parameters to be as close to *pure deterministic
+functions* as possible. That is:
 * they must be *non-interfering*
 * they should typically be *stateless*
 * they should typically have *no side effects*
 * not mentioned there, but still important: they should typically be *total functions*
 
-A contrived example of (highly undesirable) *interference* with the data source could be like this:
+### Non-interference
+
+Not only should a "behavioral parameter" be non-interfering, but other code should not interfere
+with the (non-concurrent) data source of a running *stream pipeline* either. A contrived example of (highly
+undesirable) *interference* with the (non-concurrent) data source could be like this:
 
 ```java
 int n = 30_000_000;
@@ -352,14 +356,14 @@ Runnable interference = () -> IntStream.range(0, n).forEach(i -> source.set(i, -
 
 Runnable runnable = () -> {
     // Using the data source, which is being interfered with, in a Stream pipeline
-    List<Integer> triples = IntStream.range(0, n).mapToObj(i -> source.get(i)).map(n -> 3 * n).toList();
+    List<Integer> triples = source.stream().map(n -> 3 * n).toList();
 
-    boolean isOk = triples.equals(IntStream.range(0, n).mapToObj(n -> 3 * n).toList());
-    System.out.printf("Is OK: %b%n", isOk); // Expecting false, due to the interference
+    boolean resultIsCorrect = triples.equals(IntStream.range(0, n).mapToObj(n -> 3 * n).toList());
+    System.out.printf("Result collection is correct: %b%n", resultIsCorrect); // Expecting false, due to the interference
     // The elements that probably were not interfered with
     System.out.printf("Number of non-negative numbers: %d%n", triples.stream().filter(n -> n >= 0).count());
     // The elements that were interfered with
-    System.out.printf("Number of negative numbers: %d%n", triples.stream().filter(n -> n < 0).count());
+    System.out.printf("Number of negative numbers (due to interference): %d%n", triples.stream().filter(n -> n < 0).count());
 };
 
 CompletableFuture<Void> future = CompletableFuture.allOf(
@@ -370,20 +374,62 @@ CompletableFuture<Void> future = CompletableFuture.allOf(
 future.get();
 ```
 
-Even though in this case the behavioral function `n -> 3 * n` did not interfere with the data source
-itself, interference with the data source during execution of the stream pipeline was not prevented.
+Note that in this case the behavioral function `n -> 3 * n` did not interfere with the data source
+itself. This behavioral function is as "pure" and *deterministic* as a function can be. It is other code
+interfering with the data source during execution of the stream pipeline.
 
 Had we used a Guava `ImmutableList` as data source, non-interference with the data source would have
 been ensured right from the start. That would be non-interference taken to the max. Typically, that is
-not needed, if the data source does not escape the current thread, but this contrast helps understand
-the concept of non-interference in the context of `Stream` pipelines.
+not needed, if the data source does not escape the current thread, but this sharp contrast helps understand
+the concept of non-interference in the context of `Stream` pipelines. Of course, concurrent collections
+as stream pipeline data sources would help achieve non-interference as well.
 
-If we don't limit ourselves to (non-)interference in the context of `Stream` pipelines, we have already
-seen an example of *extreme interference*, namely updating managed JPA entities deep in a call chain
-of methods that share the same transactional `Session`, causing a database update later on, at the end
-of the `Session`. Just as non-interference is desirable for behavioral parameters of Stream operations,
-it is something to strive for in a more general sense as well.
+We can take this concept of non-interference further than just the context of stream pipelines, especially
+when concurrency is involved. For example, in the context of this article about the use of Hibernate
+and jOOQ, proper database transaction management (and in particular transaction isolation) is also about
+non-interference.
 
-... stateless ...
-... no side effects ...
-... total functions (such as `IntStream.max`) ...
+### Stateless
+
+As described in the above-mentioned package summary of the `Stream` API, stateful behavioral parameters
+depend on state that may change during execution of the stream pipeline. Here is another example:
+
+```java
+import java.time.Instant;
+
+List<Integer> numbers = IntStream.range(0, 1_000_000).boxed().toList();
+
+// Not deterministic
+List<Instant> wrongInstants = numbers.stream().map(n -> Instant.now().plusMillis(n)).toList();
+
+// Fixing the non-determinism, by making the behavioral parameter stateless
+final Instant now = Instant.now();
+List<Instant> fixedInstants = numbers.stream().map(now::plusMillis).toList();
+
+Instant lastInstant = fixedInstants.getLast();
+Instant expectedLastInstant = fixedInstants.getFirst().plusMillis(1_000_000 - 1);
+// Prints true
+System.out.println(lastInstant.equals(expectedLastInstant));
+```
+
+Again, we can take this principle of stateless behavior further, which we did when giving the advice
+to use immutable Java records as DTOs rather than highly mutable JPA entities. What is a best practice
+in the small may especially be a good practice in a larger context.
+
+### No side effects
+
+The Stream API package summary has a very clear example of undesirable and even completely unnecessary
+side effects in a behavioral parameter in a stream pipeline.
+
+Again, we can and should take this further than just the context of stream pipelines. As discussed above,
+using a `StatelessSession` rather than a `Session` (and therefore a first level cache etc.) can make a
+huge difference in the number of side effects. The same goes for the use of immutable Java record DTOs
+instead of JPA entities.
+
+### Using total functions
+
+Note that the Java stream API tends to use *total functions*, which is a good thing, limiting the number
+of thrown exceptions. Take for example method `IntStream.max`. It returns an `OptionalInt`, thus accounting
+for the fact that empty integer streams have no max element.
+
+In the large, using total functions wherever this is practical is also a good practice.
