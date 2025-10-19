@@ -473,9 +473,9 @@ instead of JPA entities at service layer boundaries.
 What I am saying here is nothing new, of course. It is also consistent with advice given in the excellent
 book *Effective Java, 3rd Edition* by *Joshua Bloch*. That is a book that stood the test of time, and is
 applicable to more languages than just Java. To a large extent, that book is about writing *clear and
-predictable code*. One (of the 90) items in the book that stands out in the context of this article is
-*minimizing mutability*. That is consistent with *localizing side effects*, which is what this article
-is largely about, in the context of Hibernate.
+predictable code*. One of the 90 items in the book that stands out in the context of this article is
+*minimizing mutability*. That is consistent with *localizing and minimizing side effects*, which is what
+this article is largely about, in the context of Hibernate.
 
 ### Using total functions
 
