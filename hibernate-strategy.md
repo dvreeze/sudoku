@@ -145,7 +145,7 @@ regard:
   * the *lifecycle state* of the entity (if there is a "persistence context")
   * the extent to which *associations* have been loaded
   * cascading behavior, etc.
-* related to the previous bullet point, they contain *annotations* and therefore *depend on annotation processing* external to the entity
+* related to the previous bullet point: they contain *annotations* and therefore *depend on annotation processing* external to the entity
 * they can lead to the dreaded [`LazyInitializationException`](https://thorben-janssen.com/lazyinitializationexception/) (if there is no "persistence context")
 * they make use of [Hibernate proxies](https://thorben-janssen.com/hibernate-proxies/), thus hiding the real JPA entity
 * they certainly are not thread-safe, although sometimes that would be a desirable property
@@ -165,7 +165,7 @@ following characteristics:
 * they "attract" the immutable Guava collections such as `ImmutableList` and `ImmutableSet`, in order to explicitly promise immutability
   * note that these immutable Guava collections are "regular" *Java collections*, with stronger immutability guarantees than "unmodifiable collections"
 * they do *not use any proxies*, so what you see is what you get, and there is *no hidden state*
-* related to the previous bullet point, they typically contain *no annotations* and therefore *do not depend on any annotation processing* external to the data class
+* related to the previous bullet point: they typically contain *no annotations* and therefore *do not depend on any annotation processing* external to the data class
 * they are *thread-safe* (if all of their record components are immutable as well)
 * they are technology-agnostic, just like the abstract service layer Java interfaces passing them around
 * they do not support "bidirectional associations" if they are deeply immutable
@@ -467,13 +467,35 @@ What is a best practice in the small may especially be a good practice in a larg
 The Stream API package summary has a very clear example of undesirable and even completely unnecessary
 side effects in a behavioral parameter in a stream pipeline.
 
+A slight variation on the example given is as follows:
+
+```java
+// Unnecessary use of side effects
+List<Integer> triplesIfWeAreLucky = new ArrayList<>();
+
+// The use of "higher-order function" forEach is a give-away of side effects
+// Moreover, this is not thread-safe and is therefore not going to work
+// Potentially this leads to an ArrayIndexOutOfBoundsException, or to an empty result collection
+IntStream.range(0, 1_000_000).parallel().boxed()
+    .filter(n -> n % 3 == 0)
+    .forEach(triplesIfWeAreLucky::add);
+```
+
+The obvious fix is getting rid of the unnecessary side effect:
+
+```java
+List<Integer> triples = IntStream.range(0, 1_000_000).parallel().boxed()
+    .filter(n -> n % 3 == 0)
+    .toList();
+```
+
 Again, we can and should take this further than just the context of stream pipelines. As discussed above,
 using a `StatelessSession` rather than a `Session` (and therefore a first level cache etc.) can make a
 huge difference in the number of side effects. The same goes for the use of immutable Java record DTOs
 instead of JPA entities at service layer boundaries.
 
 What I am saying here is nothing new, of course. It is also consistent with advice given in the excellent
-book *Effective Java, 3rd Edition* by *Joshua Bloch*. That is a book that stood the test of time, and is
+book *Effective Java, 3rd Edition* by *Joshua Bloch*. That is a book that has stood the test of time, and is
 applicable to more languages than just Java. To a large extent, that book is about writing *clear and
 predictable code*. One of the 90 items in the book that stands out in the context of this article is
 *minimizing mutability*. That is consistent with *localizing and minimizing side effects*, which is what
