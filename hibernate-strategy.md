@@ -184,8 +184,8 @@ deep call chains of transactional services calling transactional services (typic
 context of the same transaction, if the transaction propagation is "REQUIRED"). So the transactional
 Hibernate `Session`/`EntityManager` is kept open across many service method calls in the call stack.
 
-Now suppose that deep in such a call stack data is *read from a (non-trivial) JPA entity*. What do or don't we
-know about that JPA entity at that point in the code, if we don't consider the calling context? Some questions
+Now suppose that deep in such a call stack data is *read from a (non-trivial) JPA entity*. What don't we
+know about that JPA entity at that point in the code, unless we consider the calling context? Some questions
 that arise are the following ones:
 * are we inside a transactional Hibernate `Session`/`EntityManager`, so is there an open *persistence context*?
 * if so, what is the "lifecycle status" of the entity? is it *managed*, *transient*, *detached* or *removed*?
@@ -384,10 +384,53 @@ not needed, if the data source does not escape the current thread, but this shar
 the concept of non-interference in the context of `Stream` pipelines. Of course, concurrent collections
 as stream pipeline data sources would help achieve non-interference as well.
 
-We can take this concept of non-interference further than just the context of stream pipelines, especially
-when concurrency is involved. For example, in the context of this article about the use of Hibernate
-and jOOQ, proper database transaction management (and in particular transaction isolation) is also about
-non-interference.
+Non-interference is to a large extent about *thread-safety*. Non-synchronized access to *shared mutable state*
+(so mutable state shared by threads) clearly invites data corruption. Mitigation strategies easily follow
+from this:
+* *do not shared* data across threads
+  * i.e., keep data *local to the current thread*
+  * this is the most widely used strategy to prevent thread-safety issues
+  * this approach scales very well
+* *do not mutate* data
+  * i.e., work with *immutable data*, such as immutable Java records
+  * such data can easily be shared across threads without any issues
+  * this approach scales quite well, especially for read-only data requiring no (functional) updates
+  * I have successfully used this approach for a shared deeply immutable XBRL taxonomy model (wrapping thousands of immutable XML DOM trees)
+* *synchronize access to shared mutable data*
+  * i.e., use low level or higher level synchronization mechanisms (preferably the latter)
+  * low level: `synchronized`, `volatile`, even `final`; see the *Java Memory Model* for the semantics
+  * high level: concurrency utilities in the `java.util.concurrent` namespace
+  * note that this is not just about preventing simultaneous access to the same data, but also about *memory visibility*
+  * this approach scales poorly when using low level locking; again, use higher level APIs
+
+Applying this to the example above, preventing interference with a data source of a running stream pipeline:
+* *do not share*: any Java collection implementation (whether thread-safe or not) will do, provided:
+  * it does not escape the current thread, and:
+  * the stream pipeline runs in the same thread (this can be a dangerous assumption)
+* *do not mutate*: immutable Guava collections are immutable and thread-safe, so cannot be tampered with
+* *synchronize access to shared mutable data*: concurrent Java collection implementations will do
+  * they are designed for concurrent access; note that they are "smarter" than old school synchronized collections
+  * so the word "synchronize" should be considered in a broader sense than locking with the `synchronized` keyword
+
+Of course, we can take this concept of non-interference further than just the context of stream pipelines.
+
+For example, according to
+[Hibernate advice from the Hibernate team](https://docs.hibernate.org/orm/7.1/introduction/html_single/#advice)
+a "persistence context" should never be leaked across threads or concurrent transactions. In other words,
+*do not share* the persistence context. Ok, but what about the injected `EntityManager` then? Clearly it
+is shared by multiple threads using the same JPA functionality. The injected `EntityManager` is a Spring
+proxy, though (i.e. a Spring `EntityManagerProxy`), which is itself not the target `EntityManager` bound
+to one "persistence context".
+
+Note that modern higher level concurrency APIs (including `CompletionStage` and `Stream.parallel`) make it
+quite easy to create multithreaded code, so it is easy to leak a persistence context to other threads if
+we are not careful. This advice from the Hibernate team is therefore important advice that should be taken
+seriously.
+
+As another (broader) example of non-interference, proper database transaction management (and in particular
+transaction isolation) in code using JPA or jOOQ is also about non-interference. In Spring (Boot) applications
+we typically use Spring's transaction management support (mostly by using the `@Transactional` annotation),
+yet it remains the responsibility of the application programmer to use it wisely.
 
 ### Stateless
 
