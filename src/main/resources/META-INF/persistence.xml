@@ -1,0 +1,15 @@
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence" version="3.1">
+    <persistence-unit name="sudoku" transaction-type="RESOURCE_LOCAL">
+        <description>Sudoku</description>
+        <class>eu.cdevreeze.sudoku.entity.CellEntity</class>
+        <class>eu.cdevreeze.sudoku.entity.GameHistoryEntity</class>
+        <class>eu.cdevreeze.sudoku.entity.GridEntity</class>
+        <class>eu.cdevreeze.sudoku.entity.StepEntity</class>
+        <class>eu.cdevreeze.sudoku.entity.StepEntityKey</class>
+        <class>eu.cdevreeze.sudoku.entity.SudokuEntity</class>
+        <exclude-unlisted-classes>true</exclude-unlisted-classes>
+        <properties>
+            <!-- Left empty. See https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2#a12384. -->
+        </properties>
+    </persistence-unit>
+</persistence>
