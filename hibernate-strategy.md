@@ -145,6 +145,7 @@ regard:
   * the *lifecycle state* of the entity (if there is a "persistence context")
   * the extent to which *associations* have been loaded
   * cascading behavior, etc.
+* related to the previous bullet point, they contain *annotations* and therefore *depend on annotation processing* external to the entity
 * they can lead to the dreaded [`LazyInitializationException`](https://thorben-janssen.com/lazyinitializationexception/) (if there is no "persistence context")
 * they make use of [Hibernate proxies](https://thorben-janssen.com/hibernate-proxies/), thus hiding the real JPA entity
 * they certainly are not thread-safe, although sometimes that would be a desirable property
@@ -164,6 +165,7 @@ following characteristics:
 * they "attract" the immutable Guava collections such as `ImmutableList` and `ImmutableSet`, in order to explicitly promise immutability
   * note that these immutable Guava collections are "regular" *Java collections*, with stronger immutability guarantees than "unmodifiable collections"
 * they do *not use any proxies*, so what you see is what you get, and there is *no hidden state*
+* related to the previous bullet point, they typically contain *no annotations* and therefore *do not depend on any annotation processing* external to the data class
 * they are *thread-safe* (if all of their record components are immutable as well)
 * they are technology-agnostic, just like the abstract service layer Java interfaces passing them around
 * they do not support "bidirectional associations" if they are deeply immutable
