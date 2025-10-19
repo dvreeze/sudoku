@@ -31,6 +31,7 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
 import org.hibernate.internal.SessionImpl;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.orm.jpa.EntityManagerProxy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -64,6 +65,7 @@ public class JpaSudokuService implements SudokuService {
     @Transactional
     public Sudoku createSudoku(Grid startGrid) {
         Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
         System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
 
         Preconditions.checkArgument(startGrid.idOption().isEmpty());
@@ -118,6 +120,7 @@ public class JpaSudokuService implements SudokuService {
     @Transactional
     public GameHistory startGame(long sudokuId, String player, Instant startTime) {
         Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
         System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
 
         // Query for associated data
@@ -152,6 +155,7 @@ public class JpaSudokuService implements SudokuService {
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value, Instant stepTime) {
         Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
         System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
 
         // Query for the JPA entity before updating it
@@ -198,6 +202,7 @@ public class JpaSudokuService implements SudokuService {
     @Transactional(readOnly = true)
     public Optional<Grid> findGrid(long gridId) {
         Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
         System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
 
         return findGridEntity(gridId).map(this::convertToGrid);
@@ -207,6 +212,7 @@ public class JpaSudokuService implements SudokuService {
     @Transactional(readOnly = true)
     public Optional<Sudoku> findSudoku(long sudokuId) {
         Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
         System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
 
         return findSudokuEntity(sudokuId).map(this::convertToSudoku);
@@ -216,6 +222,7 @@ public class JpaSudokuService implements SudokuService {
     @Transactional(readOnly = true)
     public Optional<GameHistory> findGameHistory(long gameHistoryId) {
         Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
         System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
 
         return findGameHistoryEntity(gameHistoryId).map(this::convertToGameHistory);
