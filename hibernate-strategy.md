@@ -375,8 +375,9 @@ future.get();
 ```
 
 Note that in this case the behavioral function `n -> 3 * n` did not interfere with the data source
-itself. This behavioral function is as "pure" and *deterministic* as a function can be. It is other code
-interfering with the data source during execution of the stream pipeline.
+itself. This behavioral function is as "pure" and *deterministic* as a function can be (except for potential
+integer overflow, for large values of `n`). It is other code interfering with the data source during execution
+of the stream pipeline.
 
 Had we used a Guava `ImmutableList` as data source, non-interference with the data source would have
 been ensured right from the start. That would be non-interference taken to the max. Typically, that is
@@ -387,7 +388,7 @@ as stream pipeline data sources would help achieve non-interference as well.
 Non-interference is to a large extent about *thread-safety*. Non-synchronized access to *shared mutable state*
 (so mutable state shared by threads) clearly invites data corruption. Mitigation strategies easily follow
 from this:
-* *do not shared* data across threads
+* *do not share* data across threads
   * i.e., keep data *local to the current thread*
   * this is the most widely used strategy to prevent thread-safety issues
   * this approach scales very well
@@ -456,8 +457,8 @@ System.out.println(lastInstant.equals(expectedLastInstant));
 ```
 
 Again, we can take this principle of stateless behavior further, which we did when giving the advice
-to use immutable Java records as DTOs rather than highly mutable JPA entities. What is a best practice
-in the small may especially be a good practice in a larger context.
+to use immutable Java records as DTOs rather than highly mutable JPA entities at service layer boundaries.
+What is a best practice in the small may especially be a good practice in a larger context.
 
 ### No side effects
 
@@ -467,7 +468,14 @@ side effects in a behavioral parameter in a stream pipeline.
 Again, we can and should take this further than just the context of stream pipelines. As discussed above,
 using a `StatelessSession` rather than a `Session` (and therefore a first level cache etc.) can make a
 huge difference in the number of side effects. The same goes for the use of immutable Java record DTOs
-instead of JPA entities.
+instead of JPA entities at service layer boundaries.
+
+What I am saying here is nothing new, of course. It is also consistent with advice given in the excellent
+book *Effective Java, 3rd Edition* by *Joshua Bloch*. That is a book that stood the test of time, and is
+applicable to more languages than just Java. To a large extent, that book is about writing *clear and
+predictable code*. One (of the 90) items in the book that stands out in the context of this article is
+*minimizing mutability*. That is consistent with *localizing side effects*, which is what this article
+is largely about, in the context of Hibernate.
 
 ### Using total functions
 
