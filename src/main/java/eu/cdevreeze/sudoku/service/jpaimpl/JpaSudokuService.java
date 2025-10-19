@@ -30,6 +30,7 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
 import org.hibernate.internal.SessionImpl;
+import org.hibernate.jpa.AvailableHints;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.orm.jpa.EntityManagerProxy;
 import org.springframework.stereotype.Service;
@@ -51,7 +52,7 @@ public class JpaSudokuService implements SudokuService {
 
     // See https://thorben-janssen.com/hibernate-tips-how-to-bootstrap-hibernate-with-spring-boot/
 
-    private static final String LOAD_GRAPH_KEY = "jakarta.persistence.loadgraph";
+    private static final String LOAD_GRAPH_KEY = AvailableHints.HINT_SPEC_LOAD_GRAPH;
 
     // Shared thread-safe proxy for the actual transactional EntityManager that differs for each transaction
     @PersistenceContext

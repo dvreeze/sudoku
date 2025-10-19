@@ -30,6 +30,7 @@ import jakarta.persistence.criteria.Root;
 import org.hibernate.SessionFactory;
 import org.hibernate.StatelessSession;
 import org.hibernate.internal.StatelessSessionImpl;
+import org.hibernate.jpa.AvailableHints;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
@@ -58,7 +59,7 @@ public class StatelessSessionSudokuService implements SudokuService {
     // See https://thorben-janssen.com/hibernate-tips-how-to-bootstrap-hibernate-with-spring-boot/
     // Yet this time using a StatelessSession rather than an EntityManager
 
-    private static final String LOAD_GRAPH_KEY = "jakarta.persistence.loadgraph";
+    private static final String LOAD_GRAPH_KEY = AvailableHints.HINT_SPEC_LOAD_GRAPH;
 
     private final DataSource dataSource;
     private final SessionFactory sessionFactory;
