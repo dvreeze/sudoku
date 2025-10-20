@@ -240,11 +240,20 @@ For example, Hibernate then no longer guarantees that *reading the same entity m
 same `Session` returns the same Java object*. Code that inserts or updates entities is also more verbose,
 there is no cascading support, and the code is closer to JDBC/SQL. This could be a good thing, though.
 
+Hibernate's `StatelessSession` is probably vastly underused, to a large extent due to its absence from
+the JPA standard. Gavin King even calls this
+[his billion-dollar mistake](https://in.relation.to/2025/09/24/a-billion-dollar-mistake/). The good
+thing is that we can almost pretend it is there in JPA, because even when using `StatelessSession`
+Criteria queries can be written as JPA Criteria queries (depending only on JPA), etc. So in practice
+code using `StatelessSession` may well look much the same as JPA code, with only a few Hibernate-specific
+import statements. Of course the main difference with `Session`/`EntityManager` is its stateless nature.
+
 In summary, in my opinion a *service layer* in a large Java code base using Hibernate looks like this at the
 boundary:
 * *Java interfaces* for the abstract service layer API contracts
 * the abstract methods in these Java interfaces take and return *immutable data*, such as *immutable Java records*
   * to help enforce immutability of these Java records, *Guava immutable collections* are a good fit for collection-valued fields
+* service implementation internals (directly or indirectly via "repositories") either depend on Hibernate's `Session`/`EntityManager` or `StatelessSession` (or on jOOQ)
 
 Making this service layer contract quite visible also helps in enforcing "proper" application layering.
 That is, service layer methods return "data objects", but these data objects themselves do not (directly
