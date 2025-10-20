@@ -253,7 +253,8 @@ boundary:
 * *Java interfaces* for the abstract service layer API contracts
 * the abstract methods in these Java interfaces take and return *immutable data*, such as *immutable Java records*
   * to help enforce immutability of these Java records, *Guava immutable collections* are a good fit for collection-valued fields
-* service implementation internals (directly or indirectly via "repositories") either depend on Hibernate's `Session`/`EntityManager` or `StatelessSession` (or on jOOQ)
+* service implementation internals are completely hidden behind these API contracts
+  * these internals directly or indirectly (via "repositories") either depend on Hibernate's `Session`/`EntityManager` or on Hibernate's `StatelessSession` (or on jOOQ)
 
 Making this service layer contract quite visible also helps in enforcing "proper" application layering.
 That is, service layer methods return "data objects", but these data objects themselves do not (directly
