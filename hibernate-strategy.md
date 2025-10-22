@@ -526,7 +526,7 @@ something of a *balancing act*. On the one hand, the *mutability of JPA entities
 where the database is accessed. On the other hand, it is a liability in a larger scope, where immutable
 DTOs are more predictable data holders.
 
-Some strongly related *guiding principles* when developing Java database manipulation code in Java are:
+Some strongly related *guiding principles* when developing database manipulation code in Java are:
 * Improve the extent to which we can *locally reason about code*
   * Clearly we can learn from *functional programming* here, as shown above in more than one way
   * We can learn quite a lot from the book *Effective Java, 3rd Edition* by Joshua Bloch as well
