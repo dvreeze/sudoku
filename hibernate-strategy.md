@@ -532,8 +532,9 @@ Some strongly related *guiding principles* when developing database manipulation
   * We can learn quite a lot from the book *Effective Java, 3rd Edition* by Joshua Bloch as well
 * Be *explicit about design intent*, preferably in a way that uses the *Java type system* and that can be checked by the compiler
 * Increase the extent to which *the Java compiler helps avoid bugs*
-  * As an obvious example, prefer `Optional` to `null` (just like modern Java APIs do)
+  * As an obvious example, prefer `Optional` to `null` (just like modern Java APIs do) in most cases
   * Note that the now de-facto "nullability checks" annotations from "jspecify.org" clearly nudge the developer towards less use of `null`
+  * The latter annotations are supported more and more by static analysis tooling
 
 These are related principles that are more widely applicable than just when writing Java database access code;
 they are even more widely applicable than in the context of Java. Yet they are particularly important when
