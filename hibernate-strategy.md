@@ -518,3 +518,26 @@ of thrown exceptions. Take for example method `IntStream.max`. It returns an `Op
 for the fact that empty integer streams have no max element.
 
 In the large, using total functions wherever this is practical is also a good practice.
+
+## Closing remarks
+
+As discussed above, using Hibernate (especially when using `Session` instead of `StatelessSession`) is
+something of a *balancing act*. On the one hand, the *mutability of JPA entities* is great, in a small scope
+where the database is accessed. On the other hand, it is a liability in a larger scope, where immutable
+DTOs are more predictable data holders.
+
+Some strongly related *guiding principles* when developing Java database manipulation code in Java are:
+* Improve the extent to which we can *locally reason about code*
+  * Clearly we can learn from *functional programming* here, as shown above in more than one way
+  * We can learn quite a lot from the book *Effective Java, 3rd Edition* by Joshua Bloch as well
+* Be *explicit about design intent*, preferably in a way that can be checked by the compiler and the *Java type system*
+* Increase the extent to which *the Java compiler helps avoid bugs*
+  * As an obvious example, prefer `Optional` to `null` (just like modern Java APIs do)
+  * Note that the now de-facto "nullability checks" annotations from "jspecify.org" clearly nudge the developer towards less use of `null`
+
+These are related principles that are more widely applicable than just when writing Java database access code;
+they are even more widely applicable than in the context of Java. Yet they are particularly important when
+writing Java code using Hibernate/JPA, because of the need to make a decision about the "scope of JPA entities".
+
+Hence, one (somewhat imprecise) quality metric for such Java code could be: to what extent does the Java
+compiler help to safely maintain and refactor the code?
