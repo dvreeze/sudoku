@@ -530,7 +530,7 @@ Some strongly related *guiding principles* when developing database manipulation
 * Improve the extent to which we can *locally reason about code*
   * Clearly we can learn from *functional programming* here, as shown above in more than one way
   * We can learn quite a lot from the book *Effective Java, 3rd Edition* by Joshua Bloch as well
-* Be *explicit about design intent*, preferably in a way that can be checked by the compiler and the *Java type system*
+* Be *explicit about design intent*, preferably in a way that uses the *Java type system* and that can be checked by the compiler
 * Increase the extent to which *the Java compiler helps avoid bugs*
   * As an obvious example, prefer `Optional` to `null` (just like modern Java APIs do)
   * Note that the now de-facto "nullability checks" annotations from "jspecify.org" clearly nudge the developer towards less use of `null`
