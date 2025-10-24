@@ -49,8 +49,8 @@ public class StepEntity {
     private Integer stepValue;
 
     public StepEntityKey getStepKey() {
-        Preconditions.checkArgument(gameHistory != null);
-        Preconditions.checkArgument(stepDateTime != null);
+        Preconditions.checkState(gameHistory != null);
+        Preconditions.checkState(stepDateTime != null);
         return new StepEntityKey(gameHistory, stepDateTime);
     }
 

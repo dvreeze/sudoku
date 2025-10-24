@@ -25,9 +25,12 @@ import eu.cdevreeze.sudoku.service.SudokuService;
 import org.jooq.DSLContext;
 import org.jooq.Records;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -45,6 +48,8 @@ import static org.jooq.impl.DSL.*;
 @Service
 @ConditionalOnProperty(name = "underlyingSessionType", havingValue = "org.jooq.DSLContext")
 public class JooqSudokuService implements SudokuService {
+
+    private static final Logger logger = LoggerFactory.getLogger(JooqSudokuService.class);
 
     private record CellTableRow(
             Long id,
@@ -137,11 +142,14 @@ public class JooqSudokuService implements SudokuService {
     @Override
     @Transactional
     public Sudoku createSudoku(Grid startGrid) {
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        logContext();
+
         Preconditions.checkArgument(startGrid.idOption().isEmpty());
 
         Grid grid = createGrid(startGrid);
 
-        Preconditions.checkArgument(grid.idOption().isPresent());
+        Preconditions.checkState(grid.idOption().isPresent());
 
         SudokuRecord sudokuRecord = dsl.insertInto(SUDOKU)
                 .columns(SUDOKU.START_GRID_ID)
@@ -149,7 +157,7 @@ public class JooqSudokuService implements SudokuService {
                 .returning()
                 .fetchOne();
 
-        Preconditions.checkArgument(sudokuRecord != null);
+        Preconditions.checkState(sudokuRecord != null);
 
         long sudokuId = Objects.requireNonNull(sudokuRecord.getSudokuId());
         return new Sudoku(OptionalLong.of(sudokuId), grid);
@@ -158,6 +166,9 @@ public class JooqSudokuService implements SudokuService {
     @Override
     @Transactional
     public GameHistory startGame(long sudokuId, String player, Instant startTime) {
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        logContext();
+
         Sudoku sudoku = findSudoku(sudokuId).orElseThrow();
 
         GameHistoryRecord gameHistoryRecord = dsl.insertInto(GAME_HISTORY)
@@ -169,7 +180,7 @@ public class JooqSudokuService implements SudokuService {
                 )
                 .returning()
                 .fetchOne();
-        Preconditions.checkArgument(gameHistoryRecord != null);
+        Preconditions.checkState(gameHistoryRecord != null);
 
         GameHistory gameHistory = new GameHistory(
                 OptionalLong.of(gameHistoryRecord.getGameHistoryId()),
@@ -179,7 +190,7 @@ public class JooqSudokuService implements SudokuService {
                 ImmutableList.of()
         );
 
-        Preconditions.checkArgument(gameHistory.currentGrid().isStillValid());
+        Preconditions.checkState(gameHistory.currentGrid().isStillValid());
 
         return gameHistory;
     }
@@ -187,10 +198,13 @@ public class JooqSudokuService implements SudokuService {
     @Override
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value, Instant stepTime) {
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        logContext();
+
         GameHistory gameHistory = findGameHistory(gameHistoryId).orElseThrow();
 
-        Preconditions.checkArgument(gameHistory.currentGrid().isStillValid());
-        Preconditions.checkArgument(
+        Preconditions.checkState(gameHistory.currentGrid().isStillValid());
+        Preconditions.checkState(
                 gameHistory.currentGrid().fillCellIfEmpty(pos, value).stream().anyMatch(Grid::isStillValid));
 
         StepRecord stepRecord = dsl.insertInto(STEP)
@@ -204,7 +218,7 @@ public class JooqSudokuService implements SudokuService {
                 )
                 .returning()
                 .fetchOne();
-        Preconditions.checkArgument(stepRecord != null);
+        Preconditions.checkState(stepRecord != null);
 
         GameHistory resultGameHistory = new GameHistory(
                 gameHistory.idOption(),
@@ -224,7 +238,7 @@ public class JooqSudokuService implements SudokuService {
                         .build()
         );
 
-        Preconditions.checkArgument(resultGameHistory.currentGrid().isStillValid());
+        Preconditions.checkState(resultGameHistory.currentGrid().isStillValid());
 
         return resultGameHistory;
     }
@@ -232,6 +246,9 @@ public class JooqSudokuService implements SudokuService {
     @Override
     @Transactional(readOnly = true)
     public Optional<Grid> findGrid(long gridId) {
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        logContext();
+
         return dsl.selectDistinct(
                         GRID.GRID_ID,
                         multiset(
@@ -255,6 +272,9 @@ public class JooqSudokuService implements SudokuService {
     @Override
     @Transactional(readOnly = true)
     public Optional<Sudoku> findSudoku(long sudokuId) {
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        logContext();
+
         return dsl.selectDistinct(
                         SUDOKU.SUDOKU_ID,
                         row(
@@ -283,6 +303,9 @@ public class JooqSudokuService implements SudokuService {
     @Override
     @Transactional(readOnly = true)
     public Optional<GameHistory> findGameHistory(long gameHistoryId) {
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        logContext();
+
         return dsl.selectDistinct(
                         GAME_HISTORY.GAME_HISTORY_ID,
                         GAME_HISTORY.PLAYER,
@@ -350,7 +373,7 @@ public class JooqSudokuService implements SudokuService {
                     )
                     .returning()
                     .fetchOne();
-            Preconditions.checkArgument(cellRecord != null);
+            Preconditions.checkState(cellRecord != null);
             cells.add(
                     new Cell(
                             OptionalLong.of(cellRecord.getCellId()),
@@ -363,5 +386,11 @@ public class JooqSudokuService implements SudokuService {
 
         return Grid.fromCells(ImmutableSet.copyOf(cells))
                 .withId(gridId);
+    }
+
+    private void logContext() {
+        logger.debug("Injected DSLContext: {}", dsl);
+        logger.debug("Injected DSLContext ID: {}", Objects.toIdentityString(dsl));
+        logger.debug("Transactional resource map: {}", TransactionSynchronizationManager.getResourceMap());
     }
 }

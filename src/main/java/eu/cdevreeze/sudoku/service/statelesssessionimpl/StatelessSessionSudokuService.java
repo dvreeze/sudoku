@@ -31,6 +31,8 @@ import org.hibernate.SessionFactory;
 import org.hibernate.StatelessSession;
 import org.hibernate.internal.StatelessSessionImpl;
 import org.hibernate.jpa.AvailableHints;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
@@ -38,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -55,6 +58,8 @@ import java.util.OptionalLong;
 @Service
 @ConditionalOnProperty(name = "underlyingSessionType", havingValue = "org.hibernate.StatelessSession")
 public class StatelessSessionSudokuService implements SudokuService {
+
+    private static final Logger logger = LoggerFactory.getLogger(StatelessSessionSudokuService.class);
 
     // See https://thorben-janssen.com/hibernate-tips-how-to-bootstrap-hibernate-with-spring-boot/
     // Yet this time using a StatelessSession rather than an EntityManager
@@ -78,8 +83,8 @@ public class StatelessSessionSudokuService implements SudokuService {
     @Transactional
     public Sudoku createSudoku(Grid startGrid) {
         try (StatelessSession statelessSession = openStatelessSession()) {
-            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
+            Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+            logContext(statelessSession);
 
             Preconditions.checkArgument(startGrid.idOption().isEmpty());
             Preconditions.checkArgument(startGrid.cells().stream().allMatch(c -> c.idOption().isEmpty()));
@@ -118,8 +123,8 @@ public class StatelessSessionSudokuService implements SudokuService {
             // Query for the inserted JPA entity with all associations, and return it
             Sudoku sudoku = findSudoku(sudokuEntity.getId()).orElseThrow();
 
-            Preconditions.checkArgument(sudoku.idOption().isPresent());
-            Preconditions.checkArgument(sudoku.startGrid().idOption().isPresent());
+            Preconditions.checkState(sudoku.idOption().isPresent());
+            Preconditions.checkState(sudoku.startGrid().idOption().isPresent());
             return sudoku;
         }
     }
@@ -128,8 +133,8 @@ public class StatelessSessionSudokuService implements SudokuService {
     @Transactional
     public GameHistory startGame(long sudokuId, String player, Instant startTime) {
         try (StatelessSession statelessSession = openStatelessSession()) {
-            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
+            Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+            logContext(statelessSession);
 
             // Query for associated data
             SudokuEntity sudokuEntity = findSudokuEntity(sudokuId, statelessSession).orElseThrow();
@@ -151,10 +156,10 @@ public class StatelessSessionSudokuService implements SudokuService {
             // Query for the inserted JPA entity with all associations, and return it
             GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
 
-            Preconditions.checkArgument(gameHistory.idOption().isPresent());
-            Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
-            Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
-            Preconditions.checkArgument(gameHistory.isStillValid());
+            Preconditions.checkState(gameHistory.idOption().isPresent());
+            Preconditions.checkState(gameHistory.sudoku().idOption().isPresent());
+            Preconditions.checkState(gameHistory.sudoku().startGrid().idOption().isPresent());
+            Preconditions.checkState(gameHistory.isStillValid());
             return gameHistory;
         }
     }
@@ -163,17 +168,17 @@ public class StatelessSessionSudokuService implements SudokuService {
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value, Instant stepTime) {
         try (StatelessSession statelessSession = openStatelessSession()) {
-            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
+            Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+            logContext(statelessSession);
 
             // Query for the JPA entity before updating it
             GameHistoryEntity gameHistoryEntity =
                     findGameHistoryEntity(gameHistoryId, statelessSession).orElseThrow();
 
-            Preconditions.checkArgument(gameHistoryId == Objects.requireNonNull(gameHistoryEntity.getId()));
+            Preconditions.checkState(gameHistoryId == Objects.requireNonNull(gameHistoryEntity.getId()));
             GameHistory tempGameHistory = convertToGameHistoryWithoutIds(gameHistoryEntity);
-            Preconditions.checkArgument(tempGameHistory.currentGrid().isStillValid());
-            Preconditions.checkArgument(
+            Preconditions.checkState(tempGameHistory.currentGrid().isStillValid());
+            Preconditions.checkState(
                     tempGameHistory
                             .currentGrid()
                             .fillCellIfEmpty(pos, value)
@@ -199,10 +204,10 @@ public class StatelessSessionSudokuService implements SudokuService {
             // Query for the inserted JPA entity with all associations, and return it
             GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
 
-            Preconditions.checkArgument(gameHistory.idOption().isPresent());
-            Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
-            Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
-            Preconditions.checkArgument(gameHistory.isStillValid());
+            Preconditions.checkState(gameHistory.idOption().isPresent());
+            Preconditions.checkState(gameHistory.sudoku().idOption().isPresent());
+            Preconditions.checkState(gameHistory.sudoku().startGrid().idOption().isPresent());
+            Preconditions.checkState(gameHistory.isStillValid());
             return gameHistory;
         }
     }
@@ -211,8 +216,8 @@ public class StatelessSessionSudokuService implements SudokuService {
     @Transactional(readOnly = true)
     public Optional<Grid> findGrid(long gridId) {
         try (StatelessSession statelessSession = openStatelessSession()) {
-            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
+            Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+            logContext(statelessSession);
 
             return findGridEntity(gridId, statelessSession).map(this::convertToGrid);
         }
@@ -222,8 +227,8 @@ public class StatelessSessionSudokuService implements SudokuService {
     @Transactional(readOnly = true)
     public Optional<Sudoku> findSudoku(long sudokuId) {
         try (StatelessSession statelessSession = openStatelessSession()) {
-            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
+            Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+            logContext(statelessSession);
 
             return findSudokuEntity(sudokuId, statelessSession).map(this::convertToSudoku);
         }
@@ -233,8 +238,8 @@ public class StatelessSessionSudokuService implements SudokuService {
     @Transactional(readOnly = true)
     public Optional<GameHistory> findGameHistory(long gameHistoryId) {
         try (StatelessSession statelessSession = openStatelessSession()) {
-            Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-            System.out.println("Hibernate StatelessSessionImpl: " + statelessSession.unwrap(StatelessSessionImpl.class));
+            Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+            logContext(statelessSession);
 
             return findGameHistoryEntity(gameHistoryId, statelessSession).map(this::convertToGameHistory);
         }
@@ -437,8 +442,16 @@ public class StatelessSessionSudokuService implements SudokuService {
 
     private StatelessSession openStatelessSession() {
         // This should open a StatelessSession that participates in Spring-managed transactions
-        return sessionFactory.openStatelessSession(
-                DataSourceUtils.getConnection(dataSource)
-        );
+        Connection conn = DataSourceUtils.getConnection(dataSource);
+        Preconditions.checkState(DataSourceUtils.isConnectionTransactional(conn, dataSource));
+        return sessionFactory.openStatelessSession(conn);
+    }
+
+    private void logContext(StatelessSession statelessSession) {
+        logger.debug("Used StatelessSession: {}", statelessSession);
+        logger.debug("Used StatelessSession ID: {}", Objects.toIdentityString(statelessSession));
+        logger.debug("Hibernate StatelessSessionImpl: {}", statelessSession.unwrap(StatelessSessionImpl.class));
+        logger.debug("Hibernate StatelessSessionImpl ID: {}", Objects.toIdentityString(statelessSession.unwrap(StatelessSessionImpl.class)));
+        logger.debug("Transactional resource map: {}", TransactionSynchronizationManager.getResourceMap());
     }
 }

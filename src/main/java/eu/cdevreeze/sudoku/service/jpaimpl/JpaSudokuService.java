@@ -31,6 +31,8 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
 import org.hibernate.internal.SessionImpl;
 import org.hibernate.jpa.AvailableHints;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.orm.jpa.EntityManagerProxy;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,8 @@ import java.util.*;
 @ConditionalOnProperty(name = "underlyingSessionType", havingValue = "jakarta.persistence.EntityManager", matchIfMissing = true)
 public class JpaSudokuService implements SudokuService {
 
+    private static final Logger logger = LoggerFactory.getLogger(JpaSudokuService.class);
+
     // See https://thorben-janssen.com/hibernate-tips-how-to-bootstrap-hibernate-with-spring-boot/
 
     private static final String LOAD_GRAPH_KEY = AvailableHints.HINT_SPEC_LOAD_GRAPH;
@@ -65,9 +69,9 @@ public class JpaSudokuService implements SudokuService {
     @Override
     @Transactional
     public Sudoku createSudoku(Grid startGrid) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkState(entityManager instanceof EntityManagerProxy);
+        logContext();
 
         Preconditions.checkArgument(startGrid.idOption().isEmpty());
         Preconditions.checkArgument(startGrid.cells().stream().allMatch(c -> c.idOption().isEmpty()));
@@ -112,17 +116,17 @@ public class JpaSudokuService implements SudokuService {
         // Query for the persisted JPA entity with all associations, and return it
         Sudoku sudoku = findSudoku(sudokuEntity.getId()).orElseThrow();
 
-        Preconditions.checkArgument(sudoku.idOption().isPresent());
-        Preconditions.checkArgument(sudoku.startGrid().idOption().isPresent());
+        Preconditions.checkState(sudoku.idOption().isPresent());
+        Preconditions.checkState(sudoku.startGrid().idOption().isPresent());
         return sudoku;
     }
 
     @Override
     @Transactional
     public GameHistory startGame(long sudokuId, String player, Instant startTime) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkState(entityManager instanceof EntityManagerProxy);
+        logContext();
 
         // Query for associated data
         SudokuEntity sudokuEntity = findSudokuEntity(sudokuId).orElseThrow();
@@ -145,27 +149,27 @@ public class JpaSudokuService implements SudokuService {
         // Query for the persisted JPA entity with all associations, and return it
         GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
 
-        Preconditions.checkArgument(gameHistory.idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.isStillValid());
+        Preconditions.checkState(gameHistory.idOption().isPresent());
+        Preconditions.checkState(gameHistory.sudoku().idOption().isPresent());
+        Preconditions.checkState(gameHistory.sudoku().startGrid().idOption().isPresent());
+        Preconditions.checkState(gameHistory.isStillValid());
         return gameHistory;
     }
 
     @Override
     @Transactional
     public GameHistory fillInEmptyCell(long gameHistoryId, CellPosition pos, int value, Instant stepTime) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkState(entityManager instanceof EntityManagerProxy);
+        logContext();
 
         // Query for the JPA entity before updating it
         GameHistoryEntity gameHistoryEntity = findGameHistoryEntity(gameHistoryId).orElseThrow();
 
-        Preconditions.checkArgument(gameHistoryId == Objects.requireNonNull(gameHistoryEntity.getId()));
+        Preconditions.checkState(gameHistoryId == Objects.requireNonNull(gameHistoryEntity.getId()));
         GameHistory tempGameHistory = convertToGameHistoryWithoutIds(gameHistoryEntity);
-        Preconditions.checkArgument(tempGameHistory.currentGrid().isStillValid());
-        Preconditions.checkArgument(
+        Preconditions.checkState(tempGameHistory.currentGrid().isStillValid());
+        Preconditions.checkState(
                 tempGameHistory
                         .currentGrid()
                         .fillCellIfEmpty(pos, value)
@@ -192,19 +196,19 @@ public class JpaSudokuService implements SudokuService {
         // Query for the persisted JPA entity with all associations, and return it
         GameHistory gameHistory = findGameHistory(gameHistoryEntity.getId()).orElseThrow();
 
-        Preconditions.checkArgument(gameHistory.idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.sudoku().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.sudoku().startGrid().idOption().isPresent());
-        Preconditions.checkArgument(gameHistory.isStillValid());
+        Preconditions.checkState(gameHistory.idOption().isPresent());
+        Preconditions.checkState(gameHistory.sudoku().idOption().isPresent());
+        Preconditions.checkState(gameHistory.sudoku().startGrid().idOption().isPresent());
+        Preconditions.checkState(gameHistory.isStillValid());
         return gameHistory;
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<Grid> findGrid(long gridId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkState(entityManager instanceof EntityManagerProxy);
+        logContext();
 
         return findGridEntity(gridId).map(this::convertToGrid);
     }
@@ -212,9 +216,9 @@ public class JpaSudokuService implements SudokuService {
     @Override
     @Transactional(readOnly = true)
     public Optional<Sudoku> findSudoku(long sudokuId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkState(entityManager instanceof EntityManagerProxy);
+        logContext();
 
         return findSudokuEntity(sudokuId).map(this::convertToSudoku);
     }
@@ -222,9 +226,9 @@ public class JpaSudokuService implements SudokuService {
     @Override
     @Transactional(readOnly = true)
     public Optional<GameHistory> findGameHistory(long gameHistoryId) {
-        Preconditions.checkArgument(TransactionSynchronizationManager.isActualTransactionActive());
-        Preconditions.checkArgument(entityManager instanceof EntityManagerProxy);
-        System.out.println("Hibernate SessionImpl: " + entityManager.unwrap(SessionImpl.class));
+        Preconditions.checkState(TransactionSynchronizationManager.isActualTransactionActive());
+        Preconditions.checkState(entityManager instanceof EntityManagerProxy);
+        logContext();
 
         return findGameHistoryEntity(gameHistoryId).map(this::convertToGameHistory);
     }
@@ -422,5 +426,13 @@ public class JpaSudokuService implements SudokuService {
                         ))
                         .collect(ImmutableList.toImmutableList())
         );
+    }
+
+    private void logContext() {
+        logger.debug("Injected EntityManager proxy: {}", entityManager);
+        logger.debug("Injected EntityManager proxy ID: {}", Objects.toIdentityString(entityManager));
+        logger.debug("Hibernate SessionImpl: {}", entityManager.unwrap(SessionImpl.class));
+        logger.debug("Hibernate SessionImpl ID: {}", Objects.toIdentityString(entityManager.unwrap(SessionImpl.class)));
+        logger.debug("Transactional resource map: {}", TransactionSynchronizationManager.getResourceMap());
     }
 }
