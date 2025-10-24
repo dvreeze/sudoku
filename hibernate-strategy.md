@@ -151,6 +151,10 @@ regard:
 * they certainly are not thread-safe, although sometimes that would be a desirable property
 * they are not technology-agnostic
 * they support bidirectional associations, which has its pros and cons
+  * this does have the con of introducing *circular dependencies*; see [this Sonar rule](https://rules.sonarsource.com/java/RSPEC-7027/)
+  * if we keep those circular dependencies "as local as possible", it is manageable
+  * in other words, confine them to service implementation internals
+  * admittedly, [circular dependencies across packages](https://rules.sonarsource.com/java/RSPEC-7091/) are worse
 * in practice, they often tend to "attract" the use of legacy APIs such as the mutable `java.util.Date`
 * defining *equality* (through overriding of `equals` and `hashCode`) can be a challenge for these mutable data structures
 * this programming style is rooted in old-school *imperative Java programming*, characterized by "mutability and side effects everywhere"
@@ -171,6 +175,7 @@ following characteristics:
 * they do not support "bidirectional associations" if they are deeply immutable
   * that is, record object trees are purely hierarchical ("top-down") data structures, just like XML and JSON trees
   * this is consistent with their immutable nature; one constructor call creates the (potentially deeply nested) record, which cannot be updated in-place afterward
+  * also see [this Sonar rule](https://rules.sonarsource.com/java/RSPEC-7027/)
 * in practice, they tend to "attract" modern Java APIs (that use immutable data structures), such as `java.time.Instant`
   * just compare `java.util.Date` and `java.util.Calendar` on the one hand with the *Java time API* on the other hand; it's no contest, really
 * out of the box, they offer natural *value equality* (through provided overridden `equals` and `hashCode` methods)
