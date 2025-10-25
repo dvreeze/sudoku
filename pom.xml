@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.0-M3</version>
+        <version>4.0.0-RC1</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>eu.cdevreeze.sudoku</groupId>
@@ -31,6 +31,8 @@
         <!-- See https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3 -->
         <!-- Overriding jOOQ version from 3.19.X to 3.20.X, in order to use fetchTrimmedCharValues setting -->
         <jooq.version>3.20.7</jooq.version>
+        <!-- Overriding testcontainers version from 2.0.1 back to 1.21.3, to resolve all testcontainers dependencies -->
+        <testcontainers.version>1.21.3</testcontainers.version>
         <argLine/>
     </properties>
     <dependencies>
