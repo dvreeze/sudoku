@@ -34,6 +34,7 @@
         <!-- Overriding testcontainers version from 2.0.1 back to 1.21.3, to resolve all testcontainers dependencies -->
         <testcontainers.version>1.21.3</testcontainers.version>
         <argLine/>
+        <!-- Both Jackson 2 and 3 are on the classpath. Use version 3 instead of 2! -->
     </properties>
     <dependencies>
         <dependency>
@@ -55,6 +56,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
         </dependency>
 
         <!-- Guava not provided by Spring initializr; hence, the explicit version -->
