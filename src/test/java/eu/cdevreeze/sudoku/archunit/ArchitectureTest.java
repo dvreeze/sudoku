@@ -31,6 +31,10 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 
 /**
  * Unit test testing the application architecture, using <a href="https://www.archunit.org/">ArchUnit</a>.
+ * <p>
+ * Note that the ArchUnit library is also endorsed by Spring, even to the extent that
+ * <a href="https://spring.io/projects/spring-modulith">Spring Modulith</a> is built on top of it.
+ * This project does not use Modulith, however, since it uses "traditional" application layering.
  *
  * @author Chris de Vreeze
  */
