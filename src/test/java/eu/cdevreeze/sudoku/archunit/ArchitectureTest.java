@@ -17,13 +17,17 @@
 package eu.cdevreeze.sudoku.archunit;
 
 import com.tngtech.archunit.base.DescribedPredicate;
-import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.*;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
@@ -73,6 +77,7 @@ public class ArchitectureTest {
                     .whereLayer("Web").mayOnlyBeAccessedByLayers("Wiring")
                     .whereLayer("Web").mayOnlyAccessLayers("Model", "Service")
                     .whereLayer("Service").mayOnlyBeAccessedByLayers("Web", "Wiring")
+                    .whereLayer("Service").mayOnlyAccessLayers("Model", "Entity")
                     .whereLayer("Entity").mayOnlyBeAccessedByLayers("Service")
                     .whereLayer("Entity").mayOnlyAccessLayers("Model")
                     .whereLayer("Model").mayNotAccessAnyLayer();
@@ -98,6 +103,17 @@ public class ArchitectureTest {
                     .should().resideInAPackage("..service..")
                     .allowEmptyShould(true);
 
+    // Other checks
+
+    @ArchTest
+    public static final ArchRule staticMemberClassesRule =
+            classes()
+                    .that().areMemberClasses()
+                    .and(doNotDependOnOuterClassInstance())
+                    .should().haveModifier(JavaModifier.STATIC);
+
+    // Private methods
+
     private static DescribedPredicate<JavaClass> useClass(Class<?> clazz) {
         return new DescribedPredicate<>(String.format("use class %s", clazz)) {
 
@@ -108,5 +124,66 @@ public class ArchitectureTest {
                         .anyMatch(ja -> ja.getTargetOwner().isAssignableTo(clazz));
             }
         };
+    }
+
+    private static DescribedPredicate<JavaClass> doNotDependOnOuterClassInstance() {
+        return new DescribedPredicate<>("do not depend on outer class instance") {
+
+            @Override
+            public boolean test(JavaClass javaClass) {
+                Set<JavaClass> enclosingClasses = findEnclosingClasses(javaClass);
+                Set<JavaAccess<?>> outerInstanceDependencies =
+                        findInstanceFieldAndMethodAccesses(javaClass)
+                                .stream()
+                                .filter(ja -> enclosingClasses.contains(ja.getTargetOwner()))
+                                .collect(Collectors.toSet());
+                return outerInstanceDependencies.isEmpty();
+            }
+        };
+    }
+
+    private static Set<JavaClass> findEnclosingClasses(JavaClass cls) {
+        Set<JavaClass> enclosingClassesOrSelf = new HashSet<>(Set.of(cls));
+        findEnclosingClassesOrSelf(enclosingClassesOrSelf);
+        return enclosingClassesOrSelf.stream()
+                .filter(c -> !c.equals(cls))
+                .collect(Collectors.toSet());
+    }
+
+    private static void findEnclosingClassesOrSelf(Set<JavaClass> acc) {
+        Set<JavaClass> directlyEnclosingClasses = acc.stream()
+                .flatMap(c -> c.getEnclosingClass().stream())
+                .collect(Collectors.toSet());
+
+        if (!acc.containsAll(directlyEnclosingClasses)) {
+            acc.addAll(directlyEnclosingClasses);
+            // Recursion
+            findEnclosingClassesOrSelf(acc);
+        }
+    }
+
+    private static Set<JavaAccess<?>> findInstanceFieldAndMethodAccesses(JavaClass cls) {
+        return findFieldAndMethodAccesses(cls)
+                .stream()
+                .filter(ja ->
+                        ja.getTarget().resolveMember().stream().anyMatch(ArchitectureTest::isNonStatic))
+                .collect(Collectors.toSet());
+    }
+
+    private static boolean isNonStatic(JavaMember javaMember) {
+        // The assumption is that nested records and enums are considered static
+        return javaMember.getModifiers().contains(JavaModifier.STATIC);
+    }
+
+    private static Set<JavaAccess<?>> findFieldAndMethodAccesses(JavaClass cls) {
+        return cls.getAllAccessesFromSelf()
+                .stream()
+                .filter(ja -> switch (ja) {
+                    case JavaCall<?> _ -> true; // constructor call or method call
+                    case JavaFieldAccess _ -> true;
+                    case JavaCodeUnitReference<?> _ -> true; // constructor reference or method reference
+                    default -> false;
+                })
+                .collect(Collectors.toSet());
     }
 }
