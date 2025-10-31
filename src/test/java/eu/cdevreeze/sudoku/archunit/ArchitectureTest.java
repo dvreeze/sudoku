@@ -110,7 +110,8 @@ public class ArchitectureTest {
             classes()
                     .that().areMemberClasses()
                     .and(doNotDependOnOuterClassInstance())
-                    .should().haveModifier(JavaModifier.STATIC);
+                    .should().notBeInnerClasses()
+                    .allowEmptyShould(true);
 
     // Private methods
 
