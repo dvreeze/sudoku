@@ -39,10 +39,10 @@ import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
 import java.nio.file.Path;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Gatherer;
-import java.util.stream.Gatherers;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -273,8 +273,7 @@ public class ClassFileIntrospector {
             gen.writeStringProperty("value", value.toString());
 
             gen.writeArrayPropertyStart("parameters");
-            MethodParametersInfoData.from(value.parameters()).parameters()
-                    .forEach(v -> gen.writeString(v.toString()));
+            MethodParametersInfoData.from(value.parameters()).parameters().forEach(gen::writePOJO);
             gen.writeEndArray();
 
             gen.writeEndObject();
@@ -442,72 +441,47 @@ public class ClassFileIntrospector {
     // Private static helper methods
 
     private static Class<? extends ClassFileElement> getClassFileLibraryInterface(ClassFileElement element) {
-        Set<Class<? extends ClassFileElement>> filteredClasses =
-                getAllClassFileLibraryInterfaces(element);
-
-        Preconditions.checkState(!filteredClasses.isEmpty());
-        return getMostSpecificClass(filteredClasses);
-    }
-
-    private static Set<Class<? extends ClassFileElement>> getAllClassFileLibraryInterfaces(ClassFileElement element) {
-        return getAllClassFileLibraryInterfaces(element.getClass());
-    }
-
-    private static Set<Class<? extends ClassFileElement>> getAllClassFileLibraryInterfaces(Class<? extends ClassFileElement> clazz) {
-        Set<Class<?>> startClasses = new HashSet<>();
-        startClasses.add(clazz);
-        startClasses.addAll(findAllSupertypes(clazz).stream().filter(Class::isInterface).toList());
-
-        return startClasses.stream()
-                .filter(Class::isInterface)
-                .filter(ClassFileElement.class::isAssignableFrom)
-                .filter(cls -> cls.getPackage().equals(ClassFileElement.class.getPackage()) ||
-                        cls.getPackage().equals(RecordAttribute.class.getPackage()) ||
-                        cls.getPackage().equals(InvokeInstruction.class.getPackage()))
-                .map(cls -> (Class<? extends ClassFileElement>) cls)
-                .collect(Collectors.toSet());
-    }
-
-    private static Class<? extends ClassFileElement> getMostSpecificClass(Set<Class<? extends ClassFileElement>> classes) {
-        Preconditions.checkArgument(!classes.isEmpty());
-        Preconditions.checkArgument(classes.stream().allMatch(Class::isInterface));
-        Preconditions.checkArgument(classes.stream().allMatch(ClassFileElement.class::isAssignableFrom));
-
-        Gatherer<Class<? extends ClassFileElement>, ?, Class<? extends ClassFileElement>> gatherer =
-                Gatherers.fold(
-                        () -> List.copyOf(classes).getFirst(),
-                        (acc, currElem) -> {
-                            if (acc.isAssignableFrom(currElem)) {
-                                return currElem;
-                            } else if (currElem.isAssignableFrom(acc)) {
-                                return acc;
-                            } else {
-                                var accInterfaces = getAllClassFileLibraryInterfaces(acc);
-                                var currElemInterfaces = getAllClassFileLibraryInterfaces(currElem);
-                                return accInterfaces.size() < currElemInterfaces.size() ? currElem : acc;
-                            }
-                        }
-                );
-
-        return classes.stream()
-                .gather(gatherer)
+        return findAllSupertypes(element.getClass())
+                .stream()
+                .filter(ClassFileIntrospector::isClassFileLibraryInterface)
                 .findFirst()
-                .orElse(List.copyOf(classes).getFirst());
+                .map(c -> (Class<? extends ClassFileElement>) c)
+                .orElseThrow();
     }
 
-    private static Set<Class<?>> findAllSupertypes(Class<?> cls) {
-        return findAllSupertypesOrSelf(cls).stream().skip(1).collect(Collectors.toSet());
+    private static boolean isClassFileLibraryInterface(Class<?> cls) {
+        return cls.isInterface() &&
+                ClassFileElement.class.isAssignableFrom(cls) &&
+                (cls.getPackage().equals(ClassFileElement.class.getPackage()) ||
+                        cls.getPackage().equals(RecordAttribute.class.getPackage()) ||
+                        cls.getPackage().equals(InvokeInstruction.class.getPackage()));
     }
 
-    private static Set<Class<?>> findAllSupertypesOrSelf(Class<?> cls) {
-        Set<Class<?>> result = new HashSet<>();
-        result.add(cls);
+    /**
+     * Returns all supertypes, transitively, in the "correct" order. That is, starting with the superclass
+     * and directly implemented interfaces, and ending with their uppermost supertypes.
+     */
+    private static List<Class<?>> findAllSupertypes(Class<?> cls) {
+        return findAllSupertypesOrSelf(cls).stream().skip(1).toList();
+    }
+
+    /**
+     * Returns all supertypes-or-self, transitively, in the "correct" order. That is, starting with this
+     * class itself, followed by its superclass and directly implemented interfaces, and ending with their
+     * uppermost supertypes.
+     */
+    private static List<Class<?>> findAllSupertypesOrSelf(Class<?> cls) {
+        List<Class<?>> directSupertypes =
+                Stream.concat(
+                        Optional.ofNullable(cls.getSuperclass()).stream(),
+                        Arrays.stream(cls.getInterfaces())
+                ).toList();
         // Recursion
-        result.addAll(
-                Stream.concat(Arrays.stream(cls.getInterfaces()), Optional.ofNullable(cls.getSuperclass()).stream())
-                        .flatMap(c -> findAllSupertypesOrSelf(c).stream())
-                        .collect(Collectors.toSet())
-        );
-        return Set.copyOf(result);
+        List<Class<?>> allSupertypes = directSupertypes.stream()
+                .flatMap(c -> findAllSupertypesOrSelf(c).stream())
+                .distinct()
+                .toList();
+
+        return Stream.concat(Stream.of(cls), allSupertypes.stream()).toList();
     }
 }
