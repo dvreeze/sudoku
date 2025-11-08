@@ -58,6 +58,9 @@ import java.util.stream.Stream;
  * about somewhat getting to know the Java Class File API, and understanding about how this beautiful API
  * can inspire other Java APIs that model a specific domain as sealed Java interface hierarchies, leading
  * to executable code as well.
+ * <p>
+ * To run the program, pass the file path of ".class" file as program argument. Use other programs that delegate to this
+ * class for other bootstrapping scenarios (for JDK classes, for classes on the class path, etc.).
  *
  * @author Chris de Vreeze
  */
@@ -90,6 +93,10 @@ public class ClassFileIntrospector {
         writeClassModel(classModel, System.out);
     }
 
+    public String writeClassModelAsString(ClassModel classModel) {
+        return jsonMapper.writer().writeValueAsString(classModel);
+    }
+
     static void main(String[] args) throws IOException {
         Objects.checkIndex(0, args.length);
         Path classFilePath = Path.of(args[0]);
@@ -115,6 +122,10 @@ public class ClassFileIntrospector {
             gen.writeStartObject();
             gen.writeObjectPropertyStart(getClassFileLibraryInterface(value).getSimpleName());
             gen.writePOJOProperty("symbol", ClassOrInterfaceDescData.from(value.thisClass().asSymbol()));
+            boolean isClassOrInterface = value.thisClass().asSymbol().isClassOrInterface();
+            gen.writeStringProperty("isClassOrInterface", String.valueOf(isClassOrInterface));
+            boolean isInterface = isClassOrInterface && value.flags().has(AccessFlag.INTERFACE);
+            gen.writeStringProperty("isInterface", String.valueOf(isInterface));
 
             gen.writeArrayPropertyStart("elementList");
 
@@ -440,6 +451,10 @@ public class ClassFileIntrospector {
 
     // Private static helper methods
 
+    /**
+     * Returns the most specific class file API interface (as {@link Class} object) of the passed
+     * {@link ClassFileElement} object.
+     */
     private static Class<? extends ClassFileElement> getClassFileLibraryInterface(ClassFileElement element) {
         return findAllSupertypes(element.getClass())
                 .stream()
@@ -449,6 +464,11 @@ public class ClassFileIntrospector {
                 .orElseThrow();
     }
 
+    /**
+     * Returns true if and only if the passed {@link Class} is the lowermost type of the passed
+     * {@link ClassFileElement} object such that method {@link ClassFileIntrospector#isClassFileLibraryInterface}
+     * returns true.
+     */
     private static boolean isLowermostClassFileLibraryInterface(Class<?> cls, ClassFileElement element) {
         List<Class<?>> classFileLibraryInterfaces =
                 findAllSupertypesOrSelf(element.getClass())
@@ -461,6 +481,11 @@ public class ClassFileIntrospector {
                         .noneMatch(c -> cls.isAssignableFrom(c) && !cls.equals(c));
     }
 
+    /**
+     * Returns true if and only if the parameter {@link Class} object is an interface type, with
+     * its package name belonging to the class file API, and with {@link ClassFileElement} as one of
+     * its supertypes.
+     */
     private static boolean isClassFileLibraryInterface(Class<?> cls) {
         return cls.isInterface() &&
                 ClassFileElement.class.isAssignableFrom(cls) &&
