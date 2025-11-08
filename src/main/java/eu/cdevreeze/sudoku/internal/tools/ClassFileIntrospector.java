@@ -50,7 +50,7 @@ import java.util.stream.Stream;
  * <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/classfile/package-summary.html">classfile</a>
  * API. That API requires Java 24 or later.
  * <p>
- * This does not require loading of the class. Just parsing the class file suffices.
+ * This partly requires loading of the class (for searching supertypes).
  * <p>
  * The program output is comparable to what the "javap" command outputs (when outputting the byte code
  * instructions as well). Mostly this program is about getting to know the JVM a bit better (its data
@@ -114,7 +114,7 @@ public class ClassFileIntrospector {
         public void serialize(ClassModel value, JsonGenerator gen, SerializationContext provider) throws JacksonException {
             gen.writeStartObject();
             gen.writeObjectPropertyStart(getClassFileLibraryInterface(value).getSimpleName());
-            gen.writeStringProperty("symbol", ClassOrInterfaceDescData.from(value.thisClass().asSymbol()).toString());
+            gen.writePOJOProperty("symbol", ClassOrInterfaceDescData.from(value.thisClass().asSymbol()));
 
             gen.writeArrayPropertyStart("elementList");
 
@@ -200,7 +200,7 @@ public class ClassFileIntrospector {
             gen.writeStartObject();
             gen.writeObjectPropertyStart(getClassFileLibraryInterface(value).getSimpleName());
             gen.writeStringProperty("name", value.fieldName().stringValue());
-            gen.writeStringProperty("type", ClassOrInterfaceDescData.from(value.fieldTypeSymbol()).toString());
+            gen.writePOJOProperty("type", ClassOrInterfaceDescData.from(value.fieldTypeSymbol()));
 
             gen.writeArrayPropertyStart("elementList");
 
@@ -243,7 +243,7 @@ public class ClassFileIntrospector {
             gen.writeStartObject();
             gen.writeObjectPropertyStart(getClassFileLibraryInterface(value).getSimpleName());
             gen.writeStringProperty("name", value.methodName().stringValue());
-            gen.writeStringProperty("type", MethodTypeDescData.from(value.methodTypeSymbol()).toString());
+            gen.writePOJOProperty("type", MethodTypeDescData.from(value.methodTypeSymbol()));
 
             gen.writeArrayPropertyStart("elementList");
 
@@ -443,10 +443,22 @@ public class ClassFileIntrospector {
     private static Class<? extends ClassFileElement> getClassFileLibraryInterface(ClassFileElement element) {
         return findAllSupertypes(element.getClass())
                 .stream()
-                .filter(ClassFileIntrospector::isClassFileLibraryInterface)
+                .filter(c -> isLowermostClassFileLibraryInterface(c, element))
                 .findFirst()
                 .map(c -> (Class<? extends ClassFileElement>) c)
                 .orElseThrow();
+    }
+
+    private static boolean isLowermostClassFileLibraryInterface(Class<?> cls, ClassFileElement element) {
+        List<Class<?>> classFileLibraryInterfaces =
+                findAllSupertypesOrSelf(element.getClass())
+                        .stream()
+                        .filter(ClassFileIntrospector::isClassFileLibraryInterface)
+                        .toList();
+
+        return isClassFileLibraryInterface(cls) &&
+                classFileLibraryInterfaces.stream()
+                        .noneMatch(c -> cls.isAssignableFrom(c) && !cls.equals(c));
     }
 
     private static boolean isClassFileLibraryInterface(Class<?> cls) {
