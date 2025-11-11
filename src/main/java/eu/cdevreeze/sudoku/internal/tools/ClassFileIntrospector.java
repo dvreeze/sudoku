@@ -122,10 +122,18 @@ public class ClassFileIntrospector {
             gen.writeStartObject();
             gen.writeObjectPropertyStart(getClassFileLibraryInterface(value).getSimpleName());
             gen.writePOJOProperty("symbol", ClassOrInterfaceDescData.from(value.thisClass().asSymbol()));
+
             boolean isClassOrInterface = value.thisClass().asSymbol().isClassOrInterface();
             gen.writeStringProperty("isClassOrInterface", String.valueOf(isClassOrInterface));
             boolean isInterface = isClassOrInterface && value.flags().has(AccessFlag.INTERFACE);
             gen.writeStringProperty("isInterface", String.valueOf(isInterface));
+            boolean isEnum = isClassOrInterface && value.flags().has(AccessFlag.ENUM);
+            gen.writeStringProperty("isEnum", String.valueOf(isEnum));
+            boolean isRecord = !value.findAttributes(Attributes.record()).isEmpty();
+            Preconditions.checkState(isClassOrInterface || !isRecord);
+            gen.writeStringProperty("isRecord", String.valueOf(isRecord));
+            boolean isAnnotation = isClassOrInterface && value.flags().has(AccessFlag.ANNOTATION);
+            gen.writeStringProperty("isAnnotation", String.valueOf(isAnnotation));
 
             gen.writeArrayPropertyStart("elementList");
 
