@@ -158,6 +158,10 @@ regard:
 * in practice, they often tend to "attract" the use of legacy APIs such as the mutable `java.util.Date`
 * defining *equality* (through overriding of `equals` and `hashCode`) can be a challenge for these mutable data structures
 * this programming style is rooted in old-school *imperative Java programming*, characterized by "mutability and side effects everywhere"
+* finally, when using JPA entities as DTOs, especially if they may leave the JVM, they must implement interface `Serializable`
+  * this increases complexity even further; for example, deserialization is an extra "object constructor" bypassing normal Java object construction
+  * overall, Java serialization is quite a complex topic (see the book Effective Java and its treatment of Serialization), with or without its use with JPA/Hibernate
+  * also see https://www.baeldung.com/jpa-entities-serializable
 
 In my opinion it is well worth the effort to keep JPA entities local to "database access code",
 and convert them to *(deeply) immutable Java records* (as "immutable DTOs" or "immutable value objects").
@@ -182,6 +186,10 @@ following characteristics:
 * this programming style is rooted in modern *functional Java programming*, characterized by "immutability preferred, and side effects minimized/localized"
   * there is a clear influence from OO/FP languages like *Scala*, which showed that OO is not about mutability, and that OO and FP go well together
   * limiting mutability and side effects tends to help improve code quality (again compare Java's legacy "date-time" API versus the later one)
+  * finally, if a Java (DTO) record class must be serializable, it benefits from the sane rules for record class serializability
+    * for example, during record deserialization the record's canonical constructor is called (instead of introducing an extra construction mechanism bypassing normal Java object construction)
+    * overall, Java record (de)serialization is far more sane and far less complex than Java (de)serialization in general
+    * see https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html
 
 Maybe this is not a big deal in a small code base, but in a large code base this makes a big difference
 in maintainability and low bug counts.
