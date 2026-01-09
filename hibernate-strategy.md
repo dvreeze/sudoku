@@ -191,8 +191,8 @@ following characteristics:
   * overall, Java record (de)serialization is far more sane and far less complex than Java (de)serialization in general
   * see https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html
 
-Maybe this is not a big deal in a small code base, but in a large code base this makes a big difference
-in maintainability and low bug counts.
+Maybe these vast differences between entities and immutable records are not such a big deal in a small code base,
+but in a large code base they make a big difference in maintainability and the numbers of bugs.
 
 Let's put this another way. Suppose we are maintaining a large and complex code base, in which there are
 deep call chains of transactional services calling transactional services (typically all working in the
